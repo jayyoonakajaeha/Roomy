@@ -6,10 +6,13 @@ AI 기반의 룸메이트 매칭 및 시설물 고장 자동 분석 백엔드 �
 
 ### 1. 룸메이트 매칭 (`/api/matching`)
 - **하이브리드 점수 시스템 (100점 만점)**:
-  - **태그 점수 (40점)**: 나이, 기상/취침 시간, 생활 습관(청소/음주 등)의 유사도 분석.
-  - **선호 조건 (30점)**: 비흡연, 벌레 잡기 가능 여부 등 사용자의 선호 조건 만족 시 가산점.
+  - **태그 점수 (40점)**:
+    - **나이 (5점)**: 사용자(Seeker)와 후보자의 나이 차이 기반 점수 (차이가 클수록 감점).
+    - **생활 시간 (20점)**: 기상 시간(10점) + 취침 시간(10점) 차이 분석.
+    - **생활 습관 (15점)**: 청소 주기(7.5점) + 음주 빈도(7.5점) 차이 분석.
+  - **선호 조건 (30점)**: 비흡연, 벌레 잡기, 코골이 여부 등 사용자의 선호 조건 만족 비율에 따른 배점.
   - **텍스트 유사도 (30점)**: FAISS 및 임베딩을 활용한 자기소개/룸메이트상 의미 기반 매칭.
-- **필터링**: 성별(필수), 나이 범위 등.
+- **필터링**: 성별 필터링은 API 요청 전 단계에서 수행됨을 가정합니다 (API 파라미터에서 제외).
 
 ### 2. 시설 고장 신고 (`/api/repair`)
 - **AI Vision 분석**: 고장난 시설물 사진을 업로드하면 AI가 이미지를 분석.
@@ -30,6 +33,7 @@ AI 기반의 룸메이트 매칭 및 시설물 고장 자동 분석 백엔드 �
 pip install -r requirements.txt
 
 # 2. API 키 설정
+# Upstage Console(https://console.upstage.ai/docs/getting-started)에서 API Key를 발급받으세요.
 # .env 파일을 생성하고 아래 내용을 추가하세요:
 # UPSTAGE_API_KEY=your_key_here
 ```
@@ -67,9 +71,8 @@ uvicorn app.main:app --reload
     "roommateCriteriaEmbedding": [0.1, 0.2, ...] // 내가 원하는 룸메이트 상 벡터
   },
   "preferences": {
-    "targetGender": "MALE",
-    "targetAgeRange": [20, 25],
-    "preferNonSmoker": true
+    "preferNonSmoker": true,
+    "preferGoodAtBugs": true
   },
   "candidates": [
     {
@@ -98,7 +101,7 @@ uvicorn app.main:app --reload
       "textScore": 25.5,
       "age": 23
     }
-  }
+  },
 ]
 ```
 
@@ -106,18 +109,56 @@ uvicorn app.main:app --reload
 *   **URL**: `/api/repair/analyze`
 *   **Method**: `POST`
 *   **Content-Type**: `multipart/form-data`
-*   **설명**: 고장난 시설물 이미지를 전송하면 AI가 분석 결과를 반환합니다.
+*   **설명**: 고장난 시설물 이미지를 전송하면 AI가 분석 결과를 반환합니다. 중복 신고 감지 기능이 포함되어 있습니다.
 
 #### Request
 *   `file`: 이미지 파일 (binary)
+*   `building`: 건물명 (예: "Dorm A")
+*   `floor`: 층수 (예: "3")
 
 #### Response 예시
 ```json
 {
-  "category": "plumbing",
-  "item": "faucet",
-  "issue": "leakage",
-  "severity": "medium",
-  "description": "수도꼭지에서 물이 새고 있습니다."
+  "analysis": {
+    "category": "plumbing",
+    "item": "toilet",
+    "issue": "clogged",
+    "severity": "CRITICAL",
+    "priority_score": 9,
+    "reasoning": "변기 역류로 인한 위생 문제 발생, 즉각 조치 필요.",
+    "repair_suggestion": "배관 전문 업체 호출 필요.",
+    "description": "변기가 막혀 물이 넘치고 있습니다."
+  },
+  "duplicates": [
+    {
+      "reportId": 1024,
+      "similarity": 0.95,
+      "description": "3층 화장실 변기 역류 (7분 전 신고됨)",
+      "location": "Dorm A 3F"
+    }
+  ],
+  "is_new": false
 }
 ```
+
+## DB 스키마 가이드 (백엔드 참고용)
+
+### `RepairReport` (고장 신고 테이블)
+| Field Name | Type | Key | Nullable | Description |
+|---|---|---|---|---|
+| `id` | BigInt | PK | NO | Auto Increment ID |
+| `building` | Varchar(50) | IDX | NO | 건물명 (예: "Dorm A") |
+| `floor` | Varchar(10) | IDX | NO | 층수 (예: "3") |
+| `room_number` | Varchar(20) | | YES | 호수 (선택) |
+| `category` | Varchar(50) | | NO | 고장 카테고리 (plumbing, electric 등) |
+| `item` | Varchar(100) | | NO | 고장 물품 (예: toilet, sink) |
+| `issue` | Varchar(100) | | NO | 증상 (예: clogged, leakage) |
+| `severity` | Enum | | NO | 심각도 ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW') |
+| `priority_score` | Int | | NO | AI 산정 우선순위 점수 (1~10) |
+| `reasoning` | Text | | YES | AI의 우선순위 판단 근거 |
+| `description` | Text | | NO | 상황 설명 (AI 작성 초안 or 사용자 수정본) |
+| `reporter_id` | BigInt | | NO | 신고자 User ID |
+| `status` | Enum | | NO | 상태 ('PENDING', 'IN_PROGRESS', 'DONE') |
+| `image_url` | Varchar(255) | | NO | 원본 이미지 저장 경로 |
+| `embedding` | Vector(512)* | | YES | CLIP 이미지 임베딩 (중복 검사용) |
+| `created_at` | DateTime | | NO | 생성 일시 |

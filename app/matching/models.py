@@ -83,8 +83,8 @@ class UserProfile(BaseModel):
 
 class UserPreferences(BaseModel):
     """검색 조건"""
-    targetGender: str
-    targetAgeRange: Tuple[int, int] # (min, max)
+    # Note: targetGender, targetAgeRange removed. Matching is relative to MyProfile.
+
     
     # 중요 체크리스트 (가산점 항목)
     preferNonSmoker: bool = False

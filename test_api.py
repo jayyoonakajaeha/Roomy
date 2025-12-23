@@ -31,8 +31,9 @@ def test_matching():
     }
     
     preferences = {
-        "targetGender": "MALE",
-        "targetAgeRange": [20, 25],
+        # "targetGender": "MALE",     # Removed
+        # "targetAgeRange": [20, 25], # Removed
+
         "preferNonSmoker": True,
         "preferGoodAtBugs": True,
         "queryEmbedding": None # Deprecated/Unused

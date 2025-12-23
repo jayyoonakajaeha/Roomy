@@ -93,26 +93,23 @@ def calculate_score(seeker, candidate, preferences, query_embedding):
     query_embedding: 찾는 사람의 '원하는 룸메' 텍스트 임베딩
     """
     
-    # 1. 🛑 Hard Filter (성별)
-    if preferences['target_gender'] != candidate.gender:
-        return 0 # 성별 다르면 제외
+    # 1. 🛑 Hard Filter (성별) - 제거됨 (Controller 레벨에서 필터링 가정)
+    # if preferences['target_gender'] != candidate.gender:
+    #     return 0 
 
     score = 0
     total_weight = 0
     
-    # 2. 📅 Age Filter (범위) - 감점 방식
-    # 선호 나이 범위에 들어오면 만점, 벗어나면 감점
-    min_age, max_age = preferences['target_age_range']
-    candidate_age = candidate.age
-    if min_age <= candidate_age <= max_age:
-        age_score = 100
-    else:
-        # 범위를 벗어난 만큼 감점 (1살당 10점 감점)
-        diff = min(abs(candidate_age - min_age), abs(candidate_age - max_age))
-        age_score = max(0, 100 - (diff * 10))
+    # 2. 📅 Age Filter (나이 차이) - 감점 방식 -> 점수화
+    # 본인 나이 기준 대조 (preferences에 나이 범위 없음)
+    age_diff = abs(seeker.age - candidate.age)
     
-    score += age_score * 1.0 # 가중치 1.0
-    total_weight += 1.0
+    # 나이 차이가 적을수록 점수 높음 (5살 차이까지는 어느정도 점수 부여)
+    # 0살 차이: 100점, 1살: 90점 ... 10살 이상: 0점
+    age_score = max(0, 100 - (age_diff * 10))
+    
+    score += age_score * 0.5 # 가중치 0.5로 축소
+    total_weight += 0.5
 
     # 3. 🔢 Tag Similarity (생활 습관 숫자 비교)
     # 나와 비슷한 사람을 원한다고 가정 (seeker의 속성과 비교)
@@ -208,8 +205,8 @@ if __name__ == "__main__":
 
     # 3. 나의 검색 조건 (Preferences)
     my_preferences = {
-        'target_gender': 'Male',      # 필수
-        'target_age_range': (20, 25), # 필수 (범위 - 나이로 유지, 계산은 age property 사용)
+        # 'target_gender': 'Male',      # 제거
+        # 'target_age_range': (20, 25), # 제거 (내 나이 기준 매칭)
         
         # 선택 사항 (체크리스트) -> 가산점
         'prefer_non_smoker': True,    # 흡연 안하는 사람 (매우 중요)

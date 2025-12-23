@@ -68,35 +68,36 @@ def calculate_hybrid_match(request: MatchRequest) -> List[MatchResult]:
     for cand in candidates:
         if cand.id == seeker.id: continue
         
-        # Hard Filter (성별)
-        if prefs.targetGender != cand.gender:
-            continue
+        # Hard Filter (Gender) removed per user request
 
         # --- A. Tag Score (40점 만점) ---
-        # 1. Age (10점)
+        # 1. Age (10점 배점)
+        # 0살 차이 10점, 1살 차이 9점 ... 10살 이상 0점
         cand_age = cand.age
-        min_age, max_age = prefs.targetAgeRange
-        if min_age <= cand_age <= max_age:
-            age_p = 1.0
-        else:
-            diff = min(abs(cand_age - min_age), abs(cand_age - max_age))
-            age_p = max(0.0, 1.0 - (diff * 0.1)) # 1살 차이당 10% 감점
+        seeker_age = seeker.age
+        age_diff = abs(seeker_age - cand_age)
+        
+        # 100점 만점 기준 점수: 100 - (차이 * 10)
+        age_base_score = max(0, 100 - (age_diff * 10))
+        # 40점 중 5점 비중으로 반영 (0.05 곱하기)
+        age_p = age_base_score * 0.05
         
         # 2. Time (15점) -> Wake(7.5) + Sleep(7.5)
         # Wake range: 5~11 (max diff 6)
         wake_p = get_scale_diff_score(seeker.wakeTime, cand.wakeTime, 6)
         # Sleep range: 8~14 (max diff 6)
         sleep_p = get_scale_diff_score(seeker.sleepTime, cand.sleepTime, 6)
-        time_p = (wake_p + sleep_p) / 2.0
+        # Time Total: 20점 (기상 10 + 취침 10)
+        time_p = (wake_p + sleep_p) / 2.0 * 20.0
         
         # 3. Habits (15점) -> Cleaning(7.5) + Drinking(7.5)
         # Cleaning range: 0~4 (max diff 4)
         clean_p = get_scale_diff_score(seeker.cleaningCycle.to_score(), cand.cleaningCycle.to_score(), 4)
         # Drinking range: 0~2 (max diff 2)
         drink_p = get_scale_diff_score(seeker.drinkingStyle.to_score(), cand.drinkingStyle.to_score(), 2)
-        habit_p = (clean_p + drink_p) / 2.0
+        habit_p = (clean_p + drink_p) / 2.0 * 15.0
         
-        tag_score = (age_p * 10.0) + (time_p * 15.0) + (habit_p * 15.0)
+        tag_score = age_p + time_p + habit_p
 
         # --- B. Preference Score (30점 만점) ---
         active_prefs = []
