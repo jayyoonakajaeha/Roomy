@@ -71,7 +71,6 @@ uvicorn app.main:app --reload
     "drinkingStyle": "RARELY",
     "bugKiller": false,
     "absentDays": ["SUNDAY"],
-    "absentDays": ["SUNDAY"],
     "hobby": "독서",
     "roommateCriteriaEmbedding": [0.1, 0.2, ...] // (필수) 내가 원하는 룸메이트 상 벡터
   },
@@ -95,7 +94,6 @@ uvicorn app.main:app --reload
       "cleaningCycle": "WEEKLY",
       "drinkingStyle": "SOMETIMES",
       "bugKiller": true,
-      "absentDays": [],
       "absentDays": [],
       "hobby": "게임",
       "selfIntroductionEmbedding": [0.1, 0.2, ...] // (필수) 후보자의 자기소개 벡터
