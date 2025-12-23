@@ -4,6 +4,10 @@ from typing import List
 from app.users.service import load_user_vector
 from .models import MatchRequest, MatchResult, DrinkingStyle
 
+# 점수 가중치 상수
+W_PREF = 30.0  # Preference Score 만점
+W_TEXT = 30.0  # Text Score 만점
+
 # ==========================================
 # 📏 Helper Functions
 # ==========================================

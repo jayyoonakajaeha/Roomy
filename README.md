@@ -281,3 +281,122 @@ uvicorn app.main:app --reload --port 8001
 | **HIGH** | 7-8 | 필수 생활 기능 마비 | 난방/에어컨 고장, 냉장고 고장 |
 | **MEDIUM** | 4-6 | 불편하나 생활 가능 | 방문 파손, 전등 고장 |
 | **LOW** | 1-3 | 미관상 문제 | 벽지 찢어짐, 스크래치 |
+
+---
+
+## 룸메이트 매칭 알고리즘 (Scoring Logic)
+
+### 총점 구성 (100점 만점)
+
+$$
+\text{Total Score} = \text{Tag Score}(40) + \text{Preference Score}(30) + \text{Text Score}(30)
+$$
+
+---
+
+### A. Tag Score (40점) - 기본 성향 일치도
+
+나(Seeker)와 후보자(Candidate)의 **생활 패턴 차이**를 측정합니다.
+
+#### 1. 나이 점수 (5점)
+```python
+age_diff = abs(seeker.age - cand.age)
+age_base_score = max(0, 100 - (age_diff * 10))  # 0~100
+age_score = age_base_score * 0.05               # 0~5점
+```
+| 나이 차이 | 기본 점수 | 최종 점수 |
+|-----------|-----------|-----------|
+| 0살 | 100 | 5.0점 |
+| 1살 | 90 | 4.5점 |
+| 5살 | 50 | 2.5점 |
+| 10살+ | 0 | 0점 |
+
+#### 2. 생활 시간 점수 (20점)
+**기상 시간 (10점) + 취침 시간 (10점)**
+
+```python
+def get_scale_diff_score(val1, val2, max_diff) -> float:
+    diff = abs(val1 - val2)
+    return max(0.0, 1.0 - (diff / max_diff))  # 0.0~1.0
+
+wake_score = get_scale_diff_score(seeker.wakeTime, cand.wakeTime, 6)
+sleep_score = get_scale_diff_score(seeker.sleepTime, cand.sleepTime, 6)
+time_score = (wake_score + sleep_score) / 2.0 * 20.0  # 0~20점
+```
+
+#### 3. 생활 습관 점수 (15점)
+**청소 주기 (7.5점) + 음주 빈도 (7.5점)**
+
+```python
+# CleaningCycle: DAILY=0, EVERY_TWO_DAYS=1, WEEKLY=2, MONTHLY=3, NEVER=4
+clean_score = get_scale_diff_score(seeker.cleaningCycle, cand.cleaningCycle, 4)
+
+# DrinkingStyle: RARELY=0, SOMETIMES=1, FREQUENTLY=2
+drink_score = get_scale_diff_score(seeker.drinkingStyle, cand.drinkingStyle, 2)
+
+habit_score = (clean_score + drink_score) / 2.0 * 15.0  # 0~15점
+```
+
+---
+
+### B. Preference Score (30점) - 선호 조건 만족도
+
+사용자가 **체크한 선호 조건**의 만족 비율에 따라 점수 부여.
+
+```python
+active_prefs = []
+if prefs.preferNonSmoker:   active_prefs.append(lambda u: not u.smoker)
+if prefs.preferGoodAtBugs:  active_prefs.append(lambda u: u.bugKiller)  
+if prefs.preferQuietSleeper: active_prefs.append(lambda u: not u.snoring)
+
+if len(active_prefs) == 0:
+    pref_score = 30.0  # 조건 없으면 만점
+else:
+    matched = sum(1 for check in active_prefs if check(cand))
+    pref_score = (matched / len(active_prefs)) * 30.0
+```
+
+| 체크 조건 | 만족 개수 | 점수 |
+|-----------|-----------|------|
+| 3개 | 3개 | 30점 |
+| 3개 | 2개 | 20점 |
+| 3개 | 1개 | 10점 |
+| 0개 (없음) | - | 30점 (만점) |
+
+---
+
+### C. Text Score (30점) - 텍스트 유사도
+
+**Upstage Solar Embedding** + **FAISS**를 활용한 의미 기반 매칭.
+
+```python
+# 1. 벡터 로드 (사전 저장된 .npy 파일)
+seeker_vec = load_user_vector(seeker.id, 'criteria')  # 원하는 룸메 설명
+cand_vec = load_user_vector(cand.id, 'self')          # 자기소개
+
+# 2. FAISS 코사인 유사도 검색
+faiss.normalize_L2(seeker_vec)
+faiss.normalize_L2(cand_vec)
+similarity = np.dot(seeker_vec, cand_vec.T)  # 0.0~1.0
+
+# 3. 점수 변환
+text_score = similarity * 30.0  # 0~30점
+```
+
+**사용 모델:**
+- `solar-embedding-1-large-passage`: 후보자 자기소개 임베딩
+- `solar-embedding-1-large-query`: 내가 원하는 룸메 설명 임베딩
+
+---
+
+### Hard Filter (필터링)
+
+매칭 연산 전 **제외되는 조건**:
+
+```python
+# 자기 자신 제외
+if cand.id == seeker.id: continue
+
+# 다른 성별 제외
+if cand.gender != seeker.gender: continue
+```
