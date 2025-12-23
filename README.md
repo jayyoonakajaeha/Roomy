@@ -59,16 +59,21 @@ uvicorn app.main:app --reload
   "myProfile": {
     "id": 99,
     "gender": "MALE",
+    "name": "홍길동",
     "birthYear": 2002,
-    "name": "내 이름",
+    "kakaoId": "hong123",
+    "mbti": "INTJ",
     "smoker": false,
-    "sleepTime": 14,
+    "sleepTime": 23,
     "wakeTime": 7,
-    "cleaningCycle": "DAILY",
+    "snoring": true,
+    "cleaningCycle": "EVERY_TWO_DAYS",
     "drinkingStyle": "RARELY",
-    "snoring": false,
     "bugKiller": false,
-    "roommateCriteriaEmbedding": [0.1, 0.2, ...] // 내가 원하는 룸메이트 상 벡터
+    "absentDays": ["SUNDAY"],
+    "hobby": "독서",
+    "selfDescription": "저는 더러워요 담배 피고 저녁도 같이 먹으면 좋겠네요.",
+    "roommateDescription": "깨끗하고 담배 안피는 성실한 사람 원해요. 가끔 저녁도 같이 먹으면 좋겠네요."
   },
   "preferences": {
     "preferNonSmoker": true,
@@ -77,10 +82,23 @@ uvicorn app.main:app --reload
   "candidates": [
     {
       "id": 1,
-      "name": "후보자1",
+      "id": 1,
       "gender": "MALE",
+      "name": "후보자1",
       "birthYear": 2002,
-      "selfIntroductionEmbedding": [0.1, 0.2, ...] // 후보자의 자기소개 벡터
+      "kakaoId": "candidate1",
+      "mbti": "ENFP",
+      "smoker": false,
+      "sleepTime": 24,
+      "wakeTime": 8,
+      "snoring": false,
+      "cleaningCycle": "WEEKLY",
+      "drinkingStyle": "SOMETIMES",
+      "bugKiller": true,
+      "absentDays": [],
+      "hobby": "게임",
+      "selfDescription": "조용하고 게임 좋아하는 사람입니다.",
+      "roommateDescription": "상관없음"
       // ... 기타 프로필 필드
     }
   ]
@@ -141,6 +159,30 @@ uvicorn app.main:app --reload
   "is_new": false
 }
 ```
+
+## 백엔드 통합 가이드 (Backend Integration)
+
+### 1. 사용자 프로필 저장 및 임베딩 생성
+사용자가 회원가입하거나 프로필을 수정할 때, **DB 저장과 동시에 임베딩 벡터 파일을 생성**해야 합니다.
+
+1.  **DB 저장**: 사용자 입력 정보(JSON)를 RDB(MySQL 등)에 저장.
+2.  **벡터 생성 및 저장**:
+    *   `app/users/service.py`의 `save_user_vectors` 함수 활용.
+    *   `selfDescription` -> `{user_id}_self.npy` (후보자 검색용)
+    *   `roommateDescription` -> `{user_id}_criteria.npy` (매칭 쿼리용)
+    *   저장 위치: `storage/vectors/`
+
+### 2. 매칭 API 호출 프름
+매칭 요청 시(`POST /api/matching/match`), DB와 벡터 저장소에서 데이터를 조회하여 API에 전달해야 합니다.
+
+1.  **내 정보 로드**:
+    *   DB에서 내 프로필(`myProfile`) 로드.
+    *   `storage/vectors/{myy_id}_criteria.npy`가 있다면 로드하여 `roommateCriteriaEmbedding` 필드에 주입 (선택 사항).
+2.  **후보자 리스트 로드**:
+    *   DB에서 성별 등 기본적인 필터링을 거친 후보자 리스트(`candidates`) 로드.
+    *   각 후보자에 대해 `storage/vectors/{candidate_id}_self.npy`가 있다면 로드하여 `selfIntroductionEmbedding` 필드에 주입.
+3.  **API 요청**:
+    *   완성된 JSON(벡터 포함)으로 `POST /api/matching/match` 호출.
 
 ## DB 스키마 가이드 (백엔드 참고용)
 
