@@ -16,7 +16,7 @@ def generate_vectors():
     print("Loading CLIP Model...")
     model = get_clip_model()
     
-    images = ["test1.jpg", "test2.jpg", "test3.jpg"]
+    images = ["test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg"]
     paths = []
     
     for img_name in images:
@@ -28,16 +28,7 @@ def generate_vectors():
         print(f"Processing {img_name}...")
         pil_img = Image.open(abs_path)
         
-        # Generate Vector
-        # model.encode returns Tensor or ndarray depending on options.
-        # But in service.py we use standard sentence-transformers usage.
-        # It typically returns numpy if convert_to_tensor=False (default).
-        # Let's check service.py usage: convert_to_tensor=True. 
-        # But here we want to save it as .npy.
-        
         vec = model.encode(pil_img, convert_to_numpy=True)
-        # Verify shape
-        # print(vec.shape) # Should be (512,)
         
         npy_path = abs_path.replace(".jpg", ".npy")
         np.save(npy_path, vec)
@@ -46,23 +37,16 @@ def generate_vectors():
         
     return paths
 
-@patch("app.repair.service.analyze_image_with_gemini")
-def run_verification(mock_gemini):
-    # Mock Gemini Logic
-    mock_gemini.return_value = RepairAnalysisResult(
-        item="toilet",
-        issue="clogged",
-        severity="CRITICAL",
-        priority_score=9,
-        reasoning="Test",
-        repair_suggestion="Test",
-        description="Test Case"
-    )
+
+
+def run_verification():
+    # No Mocking Gemini. Real API Call will happen.
     
     # Generate Real Vectors
     files = generate_vectors()
-    if len(files) < 3:
-        print("Not enough images found. Need test1, test2, test3.")
+    # files[0]=test1, [1]=test2, [2]=test3, [3]=test4
+    if len(files) < 4:
+        print(f"Not enough images found. Found {len(files)}, need 4.")
         return
 
     
@@ -75,15 +59,16 @@ def run_verification(mock_gemini):
     tensors = [torch.tensor(v) for v in vecs]
     
     print("\n[Debug] Pairwise Similarities:")
-    print(f"Test1 vs Test2: {util.pytorch_cos_sim(tensors[0], tensors[1]).item():.4f}")
-    if len(files) > 2:
-        print(f"Test1 vs Test3: {util.pytorch_cos_sim(tensors[0], tensors[2]).item():.4f}")
-        print(f"Test2 vs Test3: {util.pytorch_cos_sim(tensors[1], tensors[2]).item():.4f}")
+    print(f"Test1 (Base) vs Test2 (Dup?): {util.pytorch_cos_sim(tensors[0], tensors[1]).item():.4f}")
+    print(f"Test1 (Base) vs Test3 (Dup?): {util.pytorch_cos_sim(tensors[0], tensors[2]).item():.4f}")
+    if len(files) > 3:
+        print(f"Test1 (Base) vs Test4 (New?): {util.pytorch_cos_sim(tensors[0], tensors[3]).item():.4f}")
 
     # Scenario:
     # 1. Report test1 (New)
     # 2. Report test2 (Duplicate)
     # 3. Report test3 (Duplicate)
+    # 4. Report test4 (New)
     
     building = "Dorm Test"
     floor = "1"
@@ -98,7 +83,9 @@ def run_verification(mock_gemini):
     }
     res1 = client.post("/api/repair/analyze", json=req1)
     print("Status:", res1.status_code)
-    print("Is New:", res1.json()['is_new'])
+    import json
+    print("Response JSON:\n", json.dumps(res1.json(), indent=2, ensure_ascii=False))
+    
     assert res1.json()['is_new'] == True
     
     print("\n--- Test 2: Second Report (test2.jpg) - Should be Duplicate ---")
@@ -110,19 +97,9 @@ def run_verification(mock_gemini):
         "room_number": "101"
     }
     res2 = client.post("/api/repair/analyze", json=req2)
-    print("Status:", res2.status_code)
-    data2 = res2.json()
-    print("Is New:", data2['is_new'])
-    print("Duplicates Found:", len(data2['duplicates']))
-    if len(data2['duplicates']) > 0:
-        print("Similarity:", data2['duplicates'][0]['similarity'])
+    print("Is New:", res2.json()['is_new'])
+    print("Duplicates Found:", len(res2.json()['duplicates']))
     
-    # Assert
-    if data2['is_new'] is False:
-        print("SUCCESS: Detected as duplicate.")
-    else:
-        print("FAIL: Treated as new report. Similarity might be too low?")
-
     print("\n--- Test 3: Third Report (test3.jpg) - Should be Duplicate ---")
     req3 = {
         "imagePath": files[2][0],
@@ -132,13 +109,28 @@ def run_verification(mock_gemini):
         "room_number": "101"
     }
     res3 = client.post("/api/repair/analyze", json=req3)
-    print("Status:", res3.status_code)
-    data3 = res3.json()
-    print("Is New:", data3['is_new'])
-    if data3['is_new'] is False:
-        print("SUCCESS: Detected as duplicate.")
+    print("Is New:", res3.json()['is_new'])
+    
+    print("\n--- Test 4: Fourth Report (test4.jpg) - Should be NEW (Diff Issue) ---")
+    req4 = {
+        "imagePath": files[3][0],
+        "vectorPath": files[3][1],
+        "building": building,
+        "floor": floor,
+        "room_number": "101"
+    }
+    res4 = client.post("/api/repair/analyze", json=req4)
+    print("Status:", res4.status_code)
+    print("Response JSON:\n", json.dumps(res4.json(), indent=2, ensure_ascii=False))
+    
+    data4 = res4.json()
+    print("Is New:", data4['is_new'])
+    
+    if data4['is_new'] is True:
+        print("SUCCESS: Detected as NEW issue.")
     else:
-         print("FAIL: Treated as new report.")
+        print("FAIL: Treated as Duplicate.")
+        print("Duplicates:", data4['duplicates'])
 
 if __name__ == "__main__":
     run_verification()

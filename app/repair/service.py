@@ -45,7 +45,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     Enforces Korean output and strict JSON structure.
     """
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash", # Using 1.5 Flash as stable alias or 'gemini-1.5-pro' if needed. 3-flash-preview might need specific name check.
+        model_name="gemini-3-flash-preview", # User requested specific model version
         # User requested 3-flash, usually accessed via preview names or 1.5 updates. 
         # I will use 'gemini-1.5-flash' as it's the current "Flash" standard avail in most keys, 
         # or 'models/gemini-1.5-flash-latest'. If fails, will fallback.
@@ -79,8 +79,8 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
        - 미관상 문제 (예: 벽지 찢어짐, 스크래치).
 
     **분석 항목**:
-    - item: 구체적인 물건 명칭.
-    - issue: 문제 현상.
+    - item: 구체적인 물건 명칭 (한국어).
+    - issue: 문제 현상 (한국어).
     - severity: CRITICAL, HIGH, MEDIUM, LOW 중 택1.
     - priority_score: 1~10 사이 정수.
     - reasoning: 왜 이 심각도인지 논리적으로 설명 (한국어).
@@ -88,7 +88,15 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     - description: 상황 요약 (한국어).
     """
     
-    response = model.generate_content([prompt, pil_img])
+    try:
+        response = model.generate_content([prompt, pil_img])
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        return RepairAnalysisResult(
+            item="unknown", issue="unknown", 
+            severity="MEDIUM", priority_score=5, reasoning=f"API 호출 오류: {str(e)}", 
+            repair_suggestion="", description="AI 분석 중 오류가 발생했습니다."
+        )
     
     # Parse JSON
     try:

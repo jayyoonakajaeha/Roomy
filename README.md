@@ -135,13 +135,13 @@ uvicorn app.main:app --reload
 ```json
 {
   "analysis": {
-    "item": "toilet",
-    "issue": "clogged",
+    "item": "변기",
+    "issue": "배수 불량 (막힘)",
     "severity": "CRITICAL",
     "priority_score": 9,
-    "reasoning": "변기 역류로 인한 위생 문제 발생, 즉각 조치 필요.",
-    "repair_suggestion": "배관 전문 업체 호출 필요.",
-    "description": "변기가 막혀 물이 넘치고 있습니다."
+    "reasoning": "변기 막힘은 위생 문제와 직결되며 거주자의 기본 생리 욕구 해결을 불가능하게 하므로 즉각적인 조치가 필요한 긴급 사항입니다.",
+    "repair_suggestion": "압축기(뚫어뻥)를 사용하여 막힌 부분을 해결해보고, 증상이 개선되지 않을 경우 전문 설비 업체를 호출하여 배관 점검 및 이물질 제거 작업을 수행해야 합니다.",
+    "description": "과도한 화장지 사용으로 인해 변기가 막혀 배수가 원활하지 않은 상태입니다."
   },
   "duplicates": [
     {
