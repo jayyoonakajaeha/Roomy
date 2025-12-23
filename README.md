@@ -246,10 +246,11 @@ uvicorn app.main:app --reload --port 8001
 | `reporter_id` | BigInt | FK | NO | 신고자 User ID |
 | `status` | Enum | | NO | 상태 ('PENDING', 'IN_PROGRESS', 'DONE') |
 | `image_url` | Varchar(255) | | NO | 원본 이미지 저장 경로 |
-| `embedding` | Vector(512) | | YES | CLIP 이미지 임베딩 (중복 검사용) |
 | `created_at` | DateTime | | NO | 생성 일시 |
 
-> **Note**: `building` 필드는 기숙사가 하나뿐이므로 제외되었습니다.
+> **임베딩 저장 방식**: CLIP 벡터는 DB가 아닌 **로컬 파일**로 저장합니다.
+> - 경로: `storage/repair_vectors/{report_id}.npy`
+> - 로드: `np.load(f"storage/repair_vectors/{report_id}.npy")`
 
 ---
 
