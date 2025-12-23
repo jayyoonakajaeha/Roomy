@@ -71,9 +71,9 @@ uvicorn app.main:app --reload
     "drinkingStyle": "RARELY",
     "bugKiller": false,
     "absentDays": ["SUNDAY"],
+    "absentDays": ["SUNDAY"],
     "hobby": "독서",
-    "selfDescription": "저는 더러워요 담배 피고 저녁도 같이 먹으면 좋겠네요.",
-    "roommateDescription": "깨끗하고 담배 안피는 성실한 사람 원해요. 가끔 저녁도 같이 먹으면 좋겠네요."
+    "roommateCriteriaEmbedding": [0.1, 0.2, ...] // (필수) 내가 원하는 룸메이트 상 벡터
   },
   "preferences": {
     "preferNonSmoker": true,
@@ -96,9 +96,9 @@ uvicorn app.main:app --reload
       "drinkingStyle": "SOMETIMES",
       "bugKiller": true,
       "absentDays": [],
+      "absentDays": [],
       "hobby": "게임",
-      "selfDescription": "조용하고 게임 좋아하는 사람입니다.",
-      "roommateDescription": "상관없음"
+      "selfIntroductionEmbedding": [0.1, 0.2, ...] // (필수) 후보자의 자기소개 벡터
       // ... 기타 프로필 필드
     }
   ]
