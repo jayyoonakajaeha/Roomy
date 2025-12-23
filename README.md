@@ -81,7 +81,6 @@ uvicorn app.main:app --reload
   "candidates": [
     {
       "id": 1,
-      "id": 1,
       "gender": "MALE",
       "name": "후보자1",
       "birthYear": 2002,
