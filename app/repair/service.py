@@ -2,7 +2,7 @@ import os
 import json
 import base64
 import asyncio
-from typing import List, Dict
+from typing import List, Dict, Optional
 from PIL import Image
 from io import BytesIO
 from fastapi import UploadFile
@@ -107,7 +107,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
 # 🔍 Duplicate Detection (CLIP)
 # ==========================================
 
-async def check_duplicates(image_bytes: bytes, building: str, floor: str) -> List[DuplicateReportInfo]:
+async def check_duplicates(image_bytes: bytes, building: str, floor: str, room_number: Optional[str] = None) -> List[DuplicateReportInfo]:
     model = get_clip_model()
     
     # 1. Image Embedding
@@ -118,8 +118,15 @@ async def check_duplicates(image_bytes: bytes, building: str, floor: str) -> Lis
     
     # 2. Search in Mock DB
     for report in REPAIR_REPORTS:
-        # Location Filter
+        # Location Filter (Building & Floor match required)
         if report['building'] != building or report['floor'] != floor:
+            continue
+        
+        # Room Filter
+        # If input has room (Private), match exact room.
+        # If input no room (Public), match reports with no room.
+        report_room = report.get('room_number')
+        if room_number != report_room:
             continue
             
         # Similarity
@@ -128,18 +135,22 @@ async def check_duplicates(image_bytes: bytes, building: str, floor: str) -> Lis
             
             # Threshold: 0.85 (High visual similarity)
             if sim >= 0.85:
+                loc_str = f"{report['building']} {report['floor']}F"
+                if report_room:
+                    loc_str += f" {report_room}호"
+                    
                 duplicates.append(DuplicateReportInfo(
                     reportId=report['id'],
                     similarity=round(sim, 2),
                     description=report['description'],
-                    location=f"{report['building']} {report['floor']}F"
+                    location=loc_str
                 ))
     
     # Sort by sim desc
     duplicates.sort(key=lambda x: x.similarity, reverse=True)
     return duplicates
 
-async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, building: str, floor: str):
+async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, building: str, floor: str, room_number: Optional[str] = None):
     """
     In-memory save for future duplicate checks. 
     In real app, save image to S3/Disk and Embedding to VectorDB.
@@ -154,6 +165,7 @@ async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, buildi
         "id": NEXT_REPORT_ID,
         "building": building,
         "floor": floor,
+        "room_number": room_number,
         "description": analysis.description,
         "embedding": emb
     })
@@ -163,7 +175,7 @@ async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, buildi
 # 🚀 Main Logic
 # ==========================================
 
-async def process_repair_request(file: UploadFile, building: str, floor: str) -> RepairResponse:
+async def process_repair_request(file: UploadFile, building: str, floor: str, room_number: Optional[str] = None) -> RepairResponse:
     content = await file.read()
     
     # Parallelize? Gemini & CLIP
@@ -173,16 +185,12 @@ async def process_repair_request(file: UploadFile, building: str, floor: str) ->
     analysis_task = analyze_image_with_gemini(content)
     
     # 2. Check Duplicates (Only checks against *previously* saved reports)
-    duplicates_task = check_duplicates(content, building, floor)
+    duplicates_task = check_duplicates(content, building, floor, room_number)
     
     analysis, duplicates = await asyncio.gather(analysis_task, duplicates_task)
     
-    # 3. Save current report (If not duplicate? Or always save? Logic decision.)
-    # For this hackathon, we save it so it becomes a duplicate target for next time.
-    # Real logic: If duplicates found, prompt user "Is this your report?". Here we just return info.
-    
-    # Let's save it asynchronously
-    await save_report(analysis, content, building, floor)
+    # 3. Save current report
+    await save_report(analysis, content, building, floor, room_number)
     
     return RepairResponse(
         analysis=analysis,

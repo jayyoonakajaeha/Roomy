@@ -106,12 +106,13 @@ def calculate_hybrid_match(request: MatchRequest) -> List[MatchResult]:
         if prefs.preferQuietSleeper: active_prefs.append(lambda u: not u.snoring)
         if prefs.preferNonDrinker: active_prefs.append(lambda u: u.drinkingStyle == DrinkingStyle.RARELY)
         
-        pref_ratio = 0.0
-        if len(active_prefs) > 0:
+        if len(active_prefs) == 0:
+            # 선호 조건이 없으면 감점 없음 (만점)
+            pref_score = W_PREF
+        else:
             matched_cnt = sum(1 for check in active_prefs if check(cand))
-            pref_ratio = matched_cnt / len(active_prefs)
-            
-        pref_score = pref_ratio * W_PREF
+            # 만족 비율만큼 점수 부여 (== 불일치 비율만큼 감점)
+            pref_score = (matched_cnt / len(active_prefs)) * W_PREF
         
         # --- C. Text Score (30점 만점) ---
         txt_sim = text_scores_map.get(cand.id, 0.0)

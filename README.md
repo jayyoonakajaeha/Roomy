@@ -115,6 +115,7 @@ uvicorn app.main:app --reload
 *   `file`: 이미지 파일 (binary)
 *   `building`: 건물명 (예: "Dorm A")
 *   `floor`: 층수 (예: "3")
+*   `room_number`: (선택) 호수 (예: "1201"). 개인 시설인 경우 입력, 공용 시설인 경우 생략.
 
 #### Response 예시
 ```json
