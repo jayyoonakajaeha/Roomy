@@ -1,11 +1,9 @@
-from typing import List, Optional
 from pydantic import BaseModel
 from typing import List, Optional
 
 class RepairAnalysisResult(BaseModel):
-    """Gemini Analysis Result"""
-    item: str      # ex: toilet, sink, door
-    issue: str     # ex: clogged, broken_hinge
+    item: str  # 고장 물건
+    issue: str # 문제 현상
     severity: str  # CRITICAL, HIGH, MEDIUM, LOW
     priority_score: int # 1~10
     reasoning: str # 우선순위 판단 근거
@@ -25,6 +23,6 @@ class RepairResponse(BaseModel):
 
 class RepairRequest(BaseModel):
     imagePath: str  # 신규 신고 이미지 경로 (CLIP 임베딩 계산용)
-    existingReportIds: List[int] = []  # 위치가 일치하는 기존 게시물 ID 목록 (프론트에서 필터링)
+    existingReportIds: List[int] = []  # 백엔드에서 위치 필터링한 기존 게시물 ID 목록
     floor: str  # 층수
     room_number: Optional[str] = None  # 호수 (공용시설이면 null)

@@ -15,15 +15,17 @@ AI 기반의 룸메이트 매칭 및 시설물 고장 자동 분석 백엔드 �
 - **필터링**: 성별 필터링은 API 요청 전 단계에서 수행됨을 가정합니다 (API 파라미터에서 제외).
 
 ### 2. 시설 고장 신고 (`/api/repair`)
-- **AI Vision 분석**: 고장난 시설물 사진을 업로드하면 AI가 이미지를 분석.
+- **AI Vision 분석**: 고장난 시설물 사진을 업로드하면 **Gemini 3 Flash**가 이미지를 분석.
 - **자동 정보 추출**: 고장 항목, 증상, 심각도, 우선순위 등을 자동으로 JSON 데이터로 반환.
+- **중복 신고 감지**: **CLIP (clip-ViT-B-32)** 임베딩 기반 이미지 유사도 비교로 중복 판단.
 
 ## 기술 스택
 - **프레임워크**: FastAPI
 - **AI/ML**: 
   - `FAISS` (벡터 검색)
-  - `Upstage Solar` (임베딩 및 Vision/Chat API 연동 가능)
-  - `OpenAI` (Vision Model 호환 구조)
+  - `Gemini 3 Flash Preview` (이미지 분석)
+  - `CLIP (clip-ViT-B-32)` (이미지 임베딩 & 중복 감지)
+  - `Upstage Solar` (텍스트 임베딩)
 - **Data Validation**: Pydantic
 
 ## 설치 및 실행 방법
@@ -33,20 +35,22 @@ AI 기반의 룸메이트 매칭 및 시설물 고장 자동 분석 백엔드 �
 pip install -r requirements.txt
 
 # 2. API 키 설정
-# Upstage Console(https://console.upstage.ai/docs/getting-started)에서 API Key를 발급받으세요.
 # .env 파일을 생성하고 아래 내용을 추가하세요:
-# UPSTAGE_API_KEY=your_key_here
+# UPSTAGE_API_KEY=your_upstage_key
+# GOOGLE_API_KEY=your_google_key
 ```
 
 ## 사용 방법
 
 ```bash
 # 서버 실행
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
 ```
 
 ## API 문서
-서버가 실행 중일 때 `http://localhost:8000/docs` 로 접속하면 Swagger UI를 통해 API를 직접 테스트해볼 수 있습니다.
+서버가 실행 중일 때 `http://localhost:8001/docs` 로 접속하면 Swagger UI를 통해 API를 직접 테스트해볼 수 있습니다.
+
+---
 
 ### 1. 룸메이트 매칭 API
 *   **URL**: `/api/matching/match`
@@ -116,7 +120,6 @@ uvicorn app.main:app --reload
       "bugKiller": true,
       "absentDays": [],
       "hobby": "게임"
-      // ... 기타 프로필 필드
     }
   ]
 }
@@ -127,7 +130,7 @@ uvicorn app.main:app --reload
 [
   {
     "userId": 1,
-    "name": "LiveCandidate",
+    "name": "후보자1",
     "totalScore": 79.0,
     "rank": 1,
     "matchDetails": {
@@ -140,11 +143,13 @@ uvicorn app.main:app --reload
 ]
 ```
 
+---
+
 ### 2. 시설 고장 신고 API
 *   **URL**: `/api/repair/analyze`
 *   **Method**: `POST`
 *   **Content-Type**: `application/json`
-*   **설명**: 고장난 시설물 이미지를 전송하면 AI가 분석 결과를 반환합니다. 중복 신고 감지 기능이 포함되어 있습니다.
+*   **설명**: 고장난 시설물 이미지를 분석하고 중복 신고 여부를 확인합니다.
 
 #### Request 예시 (JSON)
 ```json
@@ -157,11 +162,18 @@ uvicorn app.main:app --reload
 ```
 
 **필드 설명:**
-- `imagePath`: 신규 신고 이미지 경로 (API에서 CLIP 임베딩 계산)
-- `existingReportIds`: 프론트에서 **위치(층/호수)가 일치하는 기존 게시물**의 ID 목록
-- `floor`: 층수 (필수)
-- `room_number`: 호수 (선택) - **공용시설이면 null, 이 경우 층만 일치하는 게시물 비교**
+| 필드명 | 타입 | 필수 | 설명 |
+|--------|------|------|------|
+| `imagePath` | string | ✓ | 신규 신고 이미지 경로 (API에서 CLIP 임베딩 계산) |
+| `existingReportIds` | int[] | ✓ | 백엔드에서 **위치(층/호수) 필터링한 기존 게시물 ID 목록** |
+| `floor` | string | ✓ | 층수 |
+| `room_number` | string | | 호수 (공용시설이면 null 또는 생략) |
 
+**중복 감지 흐름:**
+1. 백엔드: 신규 신고의 `floor`/`room_number`와 일치하는 기존 게시물 ID 조회
+2. 이 API 호출: `existingReportIds`에 해당 ID 목록 전달
+3. API 내부: 신규 이미지 CLIP 벡터 계산 → 기존 게시물 벡터와 비교
+4. 유사도 80% 이상이면 중복으로 판정
 
 #### Response 예시
 ```json
@@ -178,13 +190,15 @@ uvicorn app.main:app --reload
     {
       "reportId": 1024,
       "similarity": 0.95,
-      "description": "3층 화장실 변기 역류 (7분 전 신고됨)",
-      "location": "Dorm A 3F"
+      "description": "화장실 변기 역류 (7분 전 신고됨)",
+      "location": "3층 301호"
     }
   ],
   "is_new": false
 }
 ```
+
+---
 
 ## 백엔드 통합 가이드 (Backend Integration)
 
@@ -198,17 +212,22 @@ uvicorn app.main:app --reload
     *   `roommateDescription` -> `{user_id}_criteria.npy` (매칭 쿼리용)
     *   저장 위치: `storage/vectors/`
 
-### 2. 매칭 API 호출 프름
+### 2. 매칭 API 호출 흐름
 매칭 요청 시(`POST /api/matching/match`), DB와 벡터 저장소에서 데이터를 조회하여 API에 전달해야 합니다.
 
-1.  **내 정보 로드**:
-    *   DB에서 내 프로필(`myProfile`) 로드.
-    *   (API 내부에서 `storage/vectors/{myy_id}_criteria.npy`를 자동으로 로드하여 매칭에 사용합니다.)
-2.  **후보자 리스트 로드**:
-    *   DB에서 성별 등 기본적인 필터링을 거친 후보자 리스트(`candidates`) 로드.
-    *   (API 내부에서 각 후보자에 대해 `storage/vectors/{candidate_id}_self.npy`를 자동으로 로드하여 매칭에 사용합니다.)
-3.  **API 요청**:
-    *   `POST /api/matching/match` 호출. (벡터 필드 불필요)
+1.  **내 정보 로드**: DB에서 내 프로필(`myProfile`) 로드.
+2.  **후보자 리스트 로드**: DB에서 성별 등 기본적인 필터링을 거친 후보자 리스트(`candidates`) 로드.
+3.  **API 요청**: `POST /api/matching/match` 호출.
+
+### 3. 시설 고장 신고 API 호출 흐름
+1. **이미지 저장**: 사용자가 업로드한 이미지를 서버에 저장
+2. **위치 필터링**: DB에서 동일 위치(층/호수)의 기존 신고 ID 조회
+3. **API 호출**: `POST /api/repair/analyze` (imagePath + existingReportIds)
+4. **결과 처리**: 
+   - `is_new == true`: 새 신고로 DB에 저장 (임베딩도 함께 저장)
+   - `is_new == false`: 중복 신고 안내
+
+---
 
 ## DB 스키마 가이드 (백엔드 참고용)
 
@@ -216,17 +235,29 @@ uvicorn app.main:app --reload
 | Field Name | Type | Key | Nullable | Description |
 |---|---|---|---|---|
 | `id` | BigInt | PK | NO | Auto Increment ID |
-| `building` | Varchar(50) | IDX | NO | 건물명 (예: "Dorm A") |
 | `floor` | Varchar(10) | IDX | NO | 층수 (예: "3") |
-| `room_number` | Varchar(20) | | YES | 호수 (선택) |
-| `item` | Varchar(100) | | NO | 고장 물품 (예: toilet, sink) |
-| `issue` | Varchar(100) | | NO | 증상 (예: clogged, leakage) |
+| `room_number` | Varchar(20) | IDX | YES | 호수 (공용시설이면 NULL) |
+| `item` | Varchar(100) | | NO | 고장 물품 (예: 변기, 싱크대) |
+| `issue` | Varchar(100) | | NO | 증상 (예: 막힘, 누수) |
 | `severity` | Enum | | NO | 심각도 ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW') |
 | `priority_score` | Int | | NO | AI 산정 우선순위 점수 (1~10) |
 | `reasoning` | Text | | YES | AI의 우선순위 판단 근거 |
-| `description` | Text | | NO | 상황 설명 (AI 작성 초안 or 사용자 수정본) |
-| `reporter_id` | BigInt | | NO | 신고자 User ID |
+| `description` | Text | | NO | 상황 설명 (AI 작성) |
+| `reporter_id` | BigInt | FK | NO | 신고자 User ID |
 | `status` | Enum | | NO | 상태 ('PENDING', 'IN_PROGRESS', 'DONE') |
 | `image_url` | Varchar(255) | | NO | 원본 이미지 저장 경로 |
-| `embedding` | Vector(512)* | | YES | CLIP 이미지 임베딩 (중복 검사용) |
+| `embedding` | Vector(512) | | YES | CLIP 이미지 임베딩 (중복 검사용) |
 | `created_at` | DateTime | | NO | 생성 일시 |
+
+> **Note**: `building` 필드는 기숙사가 하나뿐이므로 제외되었습니다.
+
+---
+
+## 심각도 판단 기준 (Priority Logic)
+
+| 등급 | 점수 | 기준 | 예시 |
+|------|------|------|------|
+| **CRITICAL** | 9-10 | 안전/위생 위협, 주거 불가능 | 변기 역류, 가스 누출, 단전/단수 |
+| **HIGH** | 7-8 | 필수 생활 기능 마비 | 난방/에어컨 고장, 냉장고 고장 |
+| **MEDIUM** | 4-6 | 불편하나 생활 가능 | 방문 파손, 전등 고장 |
+| **LOW** | 1-3 | 미관상 문제 | 벽지 찢어짐, 스크래치 |

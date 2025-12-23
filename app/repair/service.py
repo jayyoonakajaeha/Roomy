@@ -19,7 +19,6 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Must be set in .env
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Mock Database for Reports
-# Structure: { id, building, floor, description, embedding (tensor or list), image_path }
 REPAIR_REPORTS = [] 
 NEXT_REPORT_ID = 1
 
@@ -30,7 +29,6 @@ def get_clip_model():
     global _clip_model
     if _clip_model is None:
         print("Loading CLIP Model...")
-        # using a small model for demo speed: clip-ViT-B-32
         _clip_model = SentenceTransformer('sentence-transformers/clip-ViT-B-32')
         print("CLIP Model Loaded.")
     return _clip_model
@@ -45,19 +43,13 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     Enforces Korean output and strict JSON structure.
     """
     model = genai.GenerativeModel(
-        model_name="gemini-3-flash-preview", # User requested specific model version
-        # User requested 3-flash, usually accessed via preview names or 1.5 updates. 
-        # I will use 'gemini-1.5-flash' as it's the current "Flash" standard avail in most keys, 
-        # or 'models/gemini-1.5-flash-latest'. If fails, will fallback.
+        model_name="gemini-3-flash-preview",
         generation_config={
             "response_mime_type": "application/json",
             "response_schema": RepairAnalysisResult
         }
     )
     
-    # Image Prep
-    # Gemini API supports bytes via Part if utilizing proper client.
-    # Simpler via PIL -> Blob mapping in SDK? SDK supports PIL Image directly.
     pil_img = Image.open(BytesIO(image_bytes))
     
     prompt = """
@@ -74,7 +66,6 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
        - 필수 생활 기능 마비 (예: 난방/에어컨 고장, 냉장고 고장, 싱크대 누수).
     3. **MEDIUM (중간, 점수 4-6)**: 
        - 기능상 불편하나 생활 가능 (예: 방문 파손, 식탁 의자 파손, 전등 1개 나감).
-       - *비교*: 화장실 문이 위급하게 부서졌더라도, 오수가 역류하는 변기보다는 우선순위가 낮습니다.
     4. **LOW (낮음, 점수 1-3)**: 
        - 미관상 문제 (예: 벽지 찢어짐, 스크래치).
 
@@ -83,7 +74,6 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     - issue: 문제 현상 (한국어).
     - severity: CRITICAL, HIGH, MEDIUM, LOW 중 택1.
     - priority_score: 1~10 사이 정수.
-    - reasoning: 왜 이 심각도인지 논리적으로 설명 (한국어).
     - reasoning: 왜 이 심각도인지 논리적으로 설명 (한국어).
     - description: 상황 요약 (한국어).
     """
@@ -98,17 +88,15 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
             description="AI 분석 중 오류가 발생했습니다."
         )
     
-    # Parse JSON
     try:
         data = json.loads(response.text)
         return RepairAnalysisResult(**data)
     except Exception as e:
         print(f"Gemini JSON Parse Error: {e}, Raw: {response.text}")
-        # Fallback
         return RepairAnalysisResult(
             item="unknown", issue="unknown", 
             severity="MEDIUM", priority_score=5, reasoning="분석 실패", 
-            repair_suggestion="", description="이미지 분석에 실패했습니다."
+            description="이미지 분석에 실패했습니다."
         )
 
 # ==========================================
@@ -117,17 +105,15 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
 
 async def check_duplicates(query_emb, existing_report_ids: List[int], floor: str, room_number: Optional[str] = None) -> List[DuplicateReportInfo]:
     """
-    기존 게시물 ID 목록(프론트에서 위치 기반 필터링 완료)에 대해
-    신규 이미지와의 유사도를 비교하여 중복 여부 판단.
+    백엔드에서 위치 필터링한 기존 게시물 ID 목록에 대해
+    CLIP 벡터 유사도 비교하여 중복 여부 판단.
     """
     duplicates = []
     
-    # ID 목록에 해당하는 게시물만 비교
     for report in REPAIR_REPORTS:
         if report['id'] not in existing_report_ids:
             continue
             
-        # 저장된 임베딩과 비교
         if report.get('embedding') is not None:
             sim = util.pytorch_cos_sim(query_emb, report['embedding'])[0][0].item()
             
@@ -136,6 +122,8 @@ async def check_duplicates(query_emb, existing_report_ids: List[int], floor: str
                 loc_str = f"{report['floor']}층"
                 if report.get('room_number'):
                     loc_str += f" {report['room_number']}호"
+                else:
+                    loc_str += " (공용)"
                     
                 duplicates.append(DuplicateReportInfo(
                     reportId=report['id'],
@@ -144,14 +132,12 @@ async def check_duplicates(query_emb, existing_report_ids: List[int], floor: str
                     location=loc_str
                 ))
     
-    # 유사도 높은 순 정렬
     duplicates.sort(key=lambda x: x.similarity, reverse=True)
     return duplicates
 
 async def save_report(analysis: RepairAnalysisResult, query_emb, floor: str, room_number: Optional[str] = None):
     """
     In-memory save for future duplicate checks. 
-    In real app, save image to S3/Disk and Embedding to VectorDB.
     """
     global NEXT_REPORT_ID
     
@@ -179,8 +165,6 @@ async def process_repair_request(req: RepairRequest) -> RepairResponse:
         raise ValueError(f"Image not found at {req.imagePath}")
 
     # 2. Calculate CLIP Embedding (신규 이미지 벡터 계산)
-    from PIL import Image
-    from io import BytesIO
     pil_img = Image.open(BytesIO(content))
     clip_model = get_clip_model()
     query_emb = clip_model.encode(pil_img, convert_to_numpy=True)
@@ -188,7 +172,7 @@ async def process_repair_request(req: RepairRequest) -> RepairResponse:
     # 3. Analyze (Gemini) - 병렬 처리
     analysis_task = analyze_image_with_gemini(content)
     
-    # 4. Check Duplicates (기존 게시물 ID 목록과 비교)
+    # 4. Check Duplicates (백엔드가 필터링한 ID 목록과 비교)
     duplicates_task = check_duplicates(
         query_emb, 
         req.existingReportIds,
@@ -198,7 +182,7 @@ async def process_repair_request(req: RepairRequest) -> RepairResponse:
     
     analysis, duplicates = await asyncio.gather(analysis_task, duplicates_task)
     
-    # 5. Save current report (새로 계산한 임베딩 저장)
+    # 5. Save current report
     await save_report(analysis, query_emb, req.floor, req.room_number)
     
     return RepairResponse(
