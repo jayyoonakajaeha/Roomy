@@ -221,17 +221,45 @@ uvicorn app.main:app --reload --port 8001
 
 ---
 
+### 3. 유저 벡터 생성 API
+*   **URL**: `/api/users/vector`
+*   **Method**: `POST`
+*   **Content-Type**: `application/json`
+*   **설명**: 사용자 자기소개와 룸메이트상을 **Vector Embedding**으로 변환하여 저장합니다. 회원가입 또는 프로필 수정 시 호출해야 매칭이 가능합니다.
+
+#### Request 예시
+```json
+{
+  "userId": 777,
+  "selfDescription": "저는 조용하고 깔끔한 성격입니다.",
+  "roommateDescription": "비흡연자이고 조용한 사람을 원합니다."
+}
+```
+
+#### Response 예시
+```json
+{
+  "status": "ok",
+  "message": "Vectors saved for user 777",
+  "details": {
+      "self_vector": "Saved",
+      "criteria_vector": "Saved"
+  }
+}
+```
+
+---
+
 ## 백엔드 통합 가이드 (Backend Integration)
 
 ### 1. 사용자 프로필 저장 및 임베딩 생성
-사용자가 회원가입하거나 프로필을 수정할 때, **DB 저장과 동시에 임베딩 벡터 파일을 생성**해야 합니다.
+사용자가 회원가입하거나 프로필을 수정할 때, **DB 저장 직후** 벡터 생성 API를 호출해야 합니다.
 
 1.  **DB 저장**: 사용자 입력 정보(JSON)를 RDB(MySQL 등)에 저장.
-2.  **벡터 생성 및 저장**:
-    *   `app/users/service.py`의 `save_user_vectors` 함수 활용.
-    *   `selfDescription` -> `{user_id}_self.npy` (후보자 검색용)
-    *   `roommateDescription` -> `{user_id}_criteria.npy` (매칭 쿼리용)
-    *   저장 위치: `storage/vectors/`
+2.  **벡터 생성 API 호출**:
+    *   `POST /api/users/vector` 호출 (비동기 권장).
+    *   **입력**: `userId`, `selfDescription`, `roommateDescription`
+    *   **결과**: API가 내부적으로 `storage/vectors/{userId}_*.npy` 파일 생성.
 
 ### 2. 매칭 API 호출 흐름
 매칭 요청 시(`POST /api/matching/match`), DB와 벡터 저장소에서 데이터를 조회하여 API에 전달해야 합니다.
