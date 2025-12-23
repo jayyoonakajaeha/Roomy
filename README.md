@@ -53,6 +53,27 @@ uvicorn app.main:app --reload
 *   **Method**: `POST`
 *   **설명**: 내 프로필과 후보자 리스트를 받아 점수 순으로 정렬된 매칭 결과를 반환합니다.
 
+#### 시간대 필드 스키마
+시간 필드는 실제 시간이 아닌 **시간대 인덱스**를 사용합니다:
+
+**기상 시간 (`wakeTime`)**:
+- `5`: 오전 6시 이전
+- `6`: 오전 6시~7시
+- `7`: 오전 7시~8시
+- `8`: 오전 8시~9시
+- `9`: 오전 9시~10시
+- `10`: 오전 10시~11시
+- `11`: 오전 11시 이후
+
+**취침 시간 (`sleepTime`)**:
+- `8`: 오후 9시 이전
+- `9`: 오후 9시~10시
+- `10`: 오후 10시~11시
+- `11`: 오후 11시~12시
+- `12`: 오전 12시~1시
+- `13`: 오전 1시~2시
+- `14`: 오전 2시 이후
+
 #### Request Body 예시
 ```json
 {
@@ -64,7 +85,7 @@ uvicorn app.main:app --reload
     "kakaoId": "hong123",
     "mbti": "INTJ",
     "smoker": false,
-    "sleepTime": 23,
+    "sleepTime": 11,
     "wakeTime": 7,
     "snoring": true,
     "cleaningCycle": "EVERY_TWO_DAYS",
@@ -87,7 +108,7 @@ uvicorn app.main:app --reload
       "kakaoId": "candidate1",
       "mbti": "ENFP",
       "smoker": false,
-      "sleepTime": 24,
+      "sleepTime": 12,
       "wakeTime": 8,
       "snoring": false,
       "cleaningCycle": "WEEKLY",

@@ -35,8 +35,8 @@ def test_matching():
         "birthYear": 2002,
         "name": "내 이름",
         "smoker": False,
-        "sleepTime": 14,
-        "wakeTime": 7,
+        "sleepTime": 11,  # 오후 11시~12시
+        "wakeTime": 7,    # 오전 7시~8시
         "cleaningCycle": "DAILY",
         "drinkingStyle": "RARELY",
         "snoring": False,
@@ -58,8 +58,8 @@ def test_matching():
             "gender": "MALE",
             "birthYear": 2002,
             "smoker": False,
-            "sleepTime": 14,
-            "wakeTime": 7,
+            "sleepTime": 12,  # 오전 12시~1시
+            "wakeTime": 8,    # 오전 8시~9시
             "cleaningCycle": "DAILY",
             "drinkingStyle": "RARELY",
             "snoring": False,

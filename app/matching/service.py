@@ -107,7 +107,7 @@ def calculate_hybrid_match(request: MatchRequest) -> List[MatchResult]:
         # 40점 중 5점 비중으로 반영 (0.05 곱하기)
         age_p = age_base_score * 0.05
         
-        # 2. Time (15점) -> Wake(7.5) + Sleep(7.5)
+        # 2. Time (20점) -> Wake(10) + Sleep(10)
         # Wake range: 5~11 (max diff 6)
         wake_p = get_scale_diff_score(seeker.wakeTime, cand.wakeTime, 6)
         # Sleep range: 8~14 (max diff 6)

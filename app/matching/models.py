@@ -85,8 +85,8 @@ class UserProfile(BaseModel):
                 "name": "홍길동",
                 "birthYear": 2002,
                 "smoker": False,
-                "sleepTime": 23,
-                "wakeTime": 7,
+                "sleepTime": 11,  # 오후 11시~12시 (11)
+                "wakeTime": 7,    # 오전 7시~8시 (7)
                 "snoring": False,
                 "cleaningCycle": "DAILY",
                 "drinkingStyle": "RARELY",
@@ -129,8 +129,8 @@ class MatchRequest(BaseModel):
                     "name": "홍길동",
                     "birthYear": 2002,
                     "smoker": False,
-                    "sleepTime": 23,
-                    "wakeTime": 7,
+                    "sleepTime": 11,  # 오후 11시~12시
+                    "wakeTime": 7,    # 오전 7시~8시
                     "snoring": False,
                     "cleaningCycle": "DAILY",
                     "drinkingStyle": "RARELY",
@@ -149,8 +149,8 @@ class MatchRequest(BaseModel):
                     "name": "후보자1",
                     "birthYear": 2002,
                     "smoker": False,
-                    "sleepTime": 24,
-                    "wakeTime": 8,
+                    "sleepTime": 12,  # 오전 12시~1시
+                    "wakeTime": 8,    # 오전 8시~9시
                     "snoring": False,
                     "cleaningCycle": "WEEKLY",
                     "drinkingStyle": "SOMETIMES",
