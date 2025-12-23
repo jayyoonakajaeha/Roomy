@@ -202,6 +202,7 @@ uvicorn app.main:app --reload --port 8001
 ```json
 {
   "analysis": {
+    "title": "3층 301호 변기",
     "item": "변기",
     "issue": "배수 불량 (막힘)",
     "severity": "CRITICAL",

@@ -70,6 +70,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
        - 미관상 문제 (예: 벽지 찢어짐, 스크래치).
 
     **분석 항목**:
+    **분석 항목**:
     - item: 구체적인 물건 명칭 (한국어).
     - issue: 문제 현상 (한국어).
     - severity: CRITICAL, HIGH, MEDIUM, LOW 중 택1.
@@ -83,7 +84,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     except Exception as e:
         print(f"Gemini API Error: {e}")
         return RepairAnalysisResult(
-            item="unknown", issue="unknown", 
+            title="", item="unknown", issue="unknown", 
             severity="MEDIUM", priority_score=5, reasoning=f"API 호출 오류: {str(e)}", 
             description="AI 분석 중 오류가 발생했습니다."
         )
@@ -94,7 +95,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     except Exception as e:
         print(f"Gemini JSON Parse Error: {e}, Raw: {response.text}")
         return RepairAnalysisResult(
-            item="unknown", issue="unknown", 
+            title="", item="unknown", issue="unknown", 
             severity="MEDIUM", priority_score=5, reasoning="분석 실패", 
             description="이미지 분석에 실패했습니다."
         )
@@ -212,6 +213,14 @@ async def process_repair_request(req: RepairRequest) -> RepairResponse:
     if is_new:
         # 4. 신규일 때만 Gemini 분석
         analysis = await analyze_image_with_gemini(content)
+        
+        # Title 자동 생성 (규칙: {층}층 [{호수}호] {물건})
+        location_str = f"{req.floor}층"
+        if req.room_number:
+            location_str += f" {req.room_number}호"
+        
+        analysis.title = f"{location_str} {analysis.item}"
+        
         new_id = req.totalReportCount + 1
         
         # 5. 파일 저장 (description 포함)

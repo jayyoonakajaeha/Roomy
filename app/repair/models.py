@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class RepairAnalysisResult(BaseModel):
+    title: str # 게시물 제목 (한글, 간결한 명사형)
     item: str  # 고장 물건
     issue: str # 문제 현상
     severity: str  # CRITICAL, HIGH, MEDIUM, LOW
