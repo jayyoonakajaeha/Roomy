@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 # 📐 Enums & Constants
 # ==========================================
 
+class Gender(str, Enum):
+    MALE = "MALE"
+    FEMALE = "FEMALE"
+
 class CleaningCycle(str, Enum):
     DAILY = "DAILY"
     EVERY_TWO_DAYS = "EVERY_TWO_DAYS"
@@ -44,7 +48,7 @@ class DrinkingStyle(str, Enum):
 class UserProfile(BaseModel):
     """후보자(Candidate) 및 내 정보(My Profile) 모델 - DB Schema 일치"""
     id: int 
-    gender: str # 'MALE', 'FEMALE'
+    gender: Gender
     name: str
     birthYear: int
     kakaoId: Optional[str] = None
