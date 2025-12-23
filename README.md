@@ -124,12 +124,16 @@ uvicorn app.main:app --reload
 *   **Content-Type**: `application/json`
 *   **설명**: 고장난 시설물 이미지를 전송하면 AI가 분석 결과를 반환합니다. 중복 신고 감지 기능이 포함되어 있습니다.
 
-#### Request (JSON)
-*   `imagePath`: 서버 내에 저장된 이미지 파일의 절대 경로 (Gemini 분석용)
-*   `vectorPath`: 서버 내에 저장된 이미지 임베딩 벡터(.npy) 파일의 경로 (CLIP 중복 검사용)
-*   `building`: 건물명 (예: "Dorm A")
-*   `floor`: 층수 (예: "3")
-*   `room_number`: (선택) 호수 (예: "1201"). 개인 시설인 경우 입력, 공용 시설인 경우 생략.
+#### Request 예시 (JSON)
+```json
+{
+  "imagePath": "/var/data/images/repair_01.jpg",
+  "vectorPath": "/var/data/vectors/repair_01.npy",
+  "building": "Dorm A",
+  "floor": "3",
+  "room_number": "301"
+}
+```
 
 #### Response 예시
 ```json
@@ -140,7 +144,6 @@ uvicorn app.main:app --reload
     "severity": "CRITICAL",
     "priority_score": 9,
     "reasoning": "변기 막힘은 위생 문제와 직결되며 거주자의 기본 생리 욕구 해결을 불가능하게 하므로 즉각적인 조치가 필요한 긴급 사항입니다.",
-    "repair_suggestion": "압축기(뚫어뻥)를 사용하여 막힌 부분을 해결해보고, 증상이 개선되지 않을 경우 전문 설비 업체를 호출하여 배관 점검 및 이물질 제거 작업을 수행해야 합니다.",
     "description": "과도한 화장지 사용으로 인해 변기가 막혀 배수가 원활하지 않은 상태입니다."
   },
   "duplicates": [

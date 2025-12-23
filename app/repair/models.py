@@ -9,7 +9,6 @@ class RepairAnalysisResult(BaseModel):
     severity: str  # CRITICAL, HIGH, MEDIUM, LOW
     priority_score: int # 1~10
     reasoning: str # 우선순위 판단 근거
-    repair_suggestion: str
     description: str # 한글 설명
 
 class DuplicateReportInfo(BaseModel):

@@ -38,7 +38,6 @@ def test_repair_analyze(mock_duplicates, mock_gemini):
         severity="CRITICAL",
         priority_score=9,
         reasoning="위생 문제",
-        repair_suggestion="뚫어뻥",
         description="변기 역류함."
     )
     

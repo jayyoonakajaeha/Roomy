@@ -84,7 +84,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
     - severity: CRITICAL, HIGH, MEDIUM, LOW 중 택1.
     - priority_score: 1~10 사이 정수.
     - reasoning: 왜 이 심각도인지 논리적으로 설명 (한국어).
-    - repair_suggestion: 수리 방법 제안 (한국어).
+    - reasoning: 왜 이 심각도인지 논리적으로 설명 (한국어).
     - description: 상황 요약 (한국어).
     """
     
@@ -95,7 +95,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
         return RepairAnalysisResult(
             item="unknown", issue="unknown", 
             severity="MEDIUM", priority_score=5, reasoning=f"API 호출 오류: {str(e)}", 
-            repair_suggestion="", description="AI 분석 중 오류가 발생했습니다."
+            description="AI 분석 중 오류가 발생했습니다."
         )
     
     # Parse JSON
