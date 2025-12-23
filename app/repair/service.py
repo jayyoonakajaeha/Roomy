@@ -129,7 +129,8 @@ async def check_duplicates(query_emb, existing_report_ids: List[int], floor: str
                     reportId=report['id'],
                     similarity=round(sim, 2),
                     description=report['description'],
-                    location=loc_str
+                    location=loc_str,
+                    image_url=report.get('image_url')
                 ))
     
     duplicates.sort(key=lambda x: x.similarity, reverse=True)
@@ -162,6 +163,7 @@ async def save_report_files(new_id: int, temp_image_path: str, query_emb, floor:
         "floor": floor,
         "room_number": room_number,
         "description": description,
+        "image_url": new_image_path,
         "embedding": query_emb
     })
     
