@@ -183,20 +183,14 @@ uvicorn app.main:app --reload --port 8001
 **중복 신고인 경우:**
 ```json
 {
-  "analysis": {
-    "item": "변기",
-    "issue": "배수 불량 (막힘)",
-    "severity": "CRITICAL",
-    "priority_score": 9,
-    "reasoning": "변기 막힘은 위생 문제와 직결...",
-    "description": "과도한 화장지 사용으로 인해 변기가 막혀..."
-  },
+  "analysis": null, 
   "duplicates": [
     {
       "reportId": 1024,
       "similarity": 0.95,
       "description": "화장실 변기 역류 (7분 전 신고됨)",
-      "location": "3층 301호"
+      "location": "3층 301호",
+      "image_url": "storage/repair_images/1024.jpg"
     }
   ],
   "is_new": false,
@@ -207,7 +201,14 @@ uvicorn app.main:app --reload --port 8001
 **새로운 신고인 경우:**
 ```json
 {
-  "analysis": { ... },
+  "analysis": {
+    "item": "변기",
+    "issue": "배수 불량 (막힘)",
+    "severity": "CRITICAL",
+    "priority_score": 9,
+    "reasoning": "변기 막힘은 위생 문제와 직결...",
+    "description": "과도한 화장지 사용으로 인해 변기가 막혀..."
+  },
   "duplicates": [],
   "is_new": true,
   "newReportId": 1031
