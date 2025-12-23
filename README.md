@@ -177,12 +177,14 @@ uvicorn app.main:app --reload
 
 1.  **내 정보 로드**:
     *   DB에서 내 프로필(`myProfile`) 로드.
-    *   `storage/vectors/{myy_id}_criteria.npy`가 있다면 로드하여 `roommateCriteriaEmbedding` 필드에 주입 (선택 사항).
+    *   `storage/vectors/{myy_id}_criteria.npy` 파일을 읽어서 `List[float]` 형태로 변환(deserialize).
+    *   변환된 리스트를 `myProfile.roommateCriteriaEmbedding` 필드에 값으로 주입. (주의: 파일 경로가 아닌 실제 벡터 값을 전달해야 함)
 2.  **후보자 리스트 로드**:
     *   DB에서 성별 등 기본적인 필터링을 거친 후보자 리스트(`candidates`) 로드.
-    *   각 후보자에 대해 `storage/vectors/{candidate_id}_self.npy`가 있다면 로드하여 `selfIntroductionEmbedding` 필드에 주입.
+    *   각 후보자에 대해 `storage/vectors/{candidate_id}_self.npy` 파일을 읽어서 `List[float]`로 변환.
+    *   변환된 리스트를 각 후보자 객체의 `selfIntroductionEmbedding` 필드에 주입.
 3.  **API 요청**:
-    *   완성된 JSON(벡터 포함)으로 `POST /api/matching/match` 호출.
+    *   벡터 값이 포함된 완성된 JSON으로 `POST /api/matching/match` 호출.
 
 ## DB 스키마 가이드 (백엔드 참고용)
 
