@@ -71,8 +71,7 @@ uvicorn app.main:app --reload
     "drinkingStyle": "RARELY",
     "bugKiller": false,
     "absentDays": ["SUNDAY"],
-    "hobby": "독서",
-    "roommateCriteriaEmbedding": [0.1, 0.2, ...] // (필수) 내가 원하는 룸메이트 상 벡터
+    "hobby": "독서"
   },
   "preferences": {
     "preferNonSmoker": true,
@@ -94,8 +93,7 @@ uvicorn app.main:app --reload
       "drinkingStyle": "SOMETIMES",
       "bugKiller": true,
       "absentDays": [],
-      "hobby": "게임",
-      "selfIntroductionEmbedding": [0.1, 0.2, ...] // (필수) 후보자의 자기소개 벡터
+      "hobby": "게임"
       // ... 기타 프로필 필드
     }
   ]
@@ -174,14 +172,12 @@ uvicorn app.main:app --reload
 
 1.  **내 정보 로드**:
     *   DB에서 내 프로필(`myProfile`) 로드.
-    *   `storage/vectors/{myy_id}_criteria.npy` 파일을 읽어서 `List[float]` 형태로 변환(deserialize).
-    *   변환된 리스트를 `myProfile.roommateCriteriaEmbedding` 필드에 값으로 주입. (주의: 파일 경로가 아닌 실제 벡터 값을 전달해야 함)
+    *   (API 내부에서 `storage/vectors/{myy_id}_criteria.npy`를 자동으로 로드하여 매칭에 사용합니다.)
 2.  **후보자 리스트 로드**:
     *   DB에서 성별 등 기본적인 필터링을 거친 후보자 리스트(`candidates`) 로드.
-    *   각 후보자에 대해 `storage/vectors/{candidate_id}_self.npy` 파일을 읽어서 `List[float]`로 변환.
-    *   변환된 리스트를 각 후보자 객체의 `selfIntroductionEmbedding` 필드에 주입.
+    *   (API 내부에서 각 후보자에 대해 `storage/vectors/{candidate_id}_self.npy`를 자동으로 로드하여 매칭에 사용합니다.)
 3.  **API 요청**:
-    *   벡터 값이 포함된 완성된 JSON으로 `POST /api/matching/match` 호출.
+    *   `POST /api/matching/match` 호출. (벡터 필드 불필요)
 
 ## DB 스키마 가이드 (백엔드 참고용)
 
@@ -192,7 +188,6 @@ uvicorn app.main:app --reload
 | `building` | Varchar(50) | IDX | NO | 건물명 (예: "Dorm A") |
 | `floor` | Varchar(10) | IDX | NO | 층수 (예: "3") |
 | `room_number` | Varchar(20) | | YES | 호수 (선택) |
-| `category` | Varchar(50) | | NO | 고장 카테고리 (plumbing, electric 등) |
 | `item` | Varchar(100) | | NO | 고장 물품 (예: toilet, sink) |
 | `issue` | Varchar(100) | | NO | 증상 (예: clogged, leakage) |
 | `severity` | Enum | | NO | 심각도 ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW') |

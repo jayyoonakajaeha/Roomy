@@ -1,6 +1,7 @@
 import numpy as np
 import faiss
 from typing import List
+from app.users.service import load_user_vector
 from .models import MatchRequest, MatchResult, DrinkingStyle
 
 # ==========================================
@@ -24,28 +25,51 @@ def calculate_hybrid_match(request: MatchRequest) -> List[MatchResult]:
     candidates = request.candidates
     
     # 1. FAISS Vector Search 준비
-    # Target: Candidates' selfIntroductionEmbedding
-    # Query: Seeker's roommateCriteriaEmbedding
+    # Load embeddings directly from storage
     
-    valid_candidates_with_emb = [c for c in candidates if c.selfIntroductionEmbedding is not None and len(c.selfIntroductionEmbedding) > 0]
+    # 1-1. Seeker Criteria Embedding
+    seeker_vec = None
+    if seeker.roommateCriteriaEmbedding:
+        # If provided in request (fallback/debug), use it
+        seeker_vec = np.array([seeker.roommateCriteriaEmbedding], dtype='float32')
+    else:
+        # Load from disk
+        loaded = load_user_vector(seeker.id, 'criteria') # {id}_criteria.npy
+        if loaded is not None:
+             seeker_vec = np.array([loaded], dtype='float32')
+             
+    # 1-2. Candidates Self Embeddings
+    valid_candidates_with_emb = []
+    candidate_vectors = []
+    
+    for c in candidates:
+        if c.selfIntroductionEmbedding:
+             # Provided in request
+             valid_candidates_with_emb.append(c)
+             candidate_vectors.append(c.selfIntroductionEmbedding)
+        else:
+             # Load from disk
+             loaded = load_user_vector(c.id, 'self') # {id}_self.npy
+             if loaded is not None:
+                 valid_candidates_with_emb.append(c)
+                 candidate_vectors.append(loaded)
+    
     text_scores_map = {} 
     
-    # Seeker must have roommateCriteriaEmbedding to search
-    if valid_candidates_with_emb and seeker.roommateCriteriaEmbedding:
-        d = len(seeker.roommateCriteriaEmbedding)
+    if seeker_vec is not None and len(candidate_vectors) > 0:
+        d = seeker_vec.shape[1]
         index = faiss.IndexFlatIP(d) 
         
-        # Candidate Matrix (Self Description Vectors)
-        candidate_matrix = np.array([c.selfIntroductionEmbedding for c in valid_candidates_with_emb], dtype='float32')
+        # Candidate Matrix
+        candidate_matrix = np.array(candidate_vectors, dtype='float32')
         faiss.normalize_L2(candidate_matrix)
         index.add(candidate_matrix)
         
-        # Query Vector (Seeker's Roommate Criteria)
-        query_vec = np.array([seeker.roommateCriteriaEmbedding], dtype='float32')
-        faiss.normalize_L2(query_vec)
+        # Query Vector
+        faiss.normalize_L2(seeker_vec)
         
-        k = len(valid_candidates_with_emb)
-        D, I = index.search(query_vec, k)
+        k = len(candidate_vectors)
+        D, I = index.search(seeker_vec, k)
         
         distances = D[0]
         indices = I[0]
@@ -53,9 +77,8 @@ def calculate_hybrid_match(request: MatchRequest) -> List[MatchResult]:
         for i, idx in enumerate(indices):
             if idx == -1: continue
             c_user = valid_candidates_with_emb[idx]
-            # Cosine Sim (-1~1) -> 0~1 Scale
             sim = max(0.0, float(distances[i]))
-            text_scores_map[c_user.id] = sim # 0.0 ~ 1.0
+            text_scores_map[c_user.id] = sim
 
     # 2. Scoring Loop
     results = []

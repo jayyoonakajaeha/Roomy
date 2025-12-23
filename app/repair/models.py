@@ -3,7 +3,6 @@ from typing import List, Optional
 
 class RepairAnalysisResult(BaseModel):
     """Gemini Analysis Result"""
-    category: str # plumbing, electric, appliance, furniture, structure, etc.
     item: str      # ex: toilet, sink, door
     issue: str     # ex: clogged, broken_hinge
     severity: str  # CRITICAL, HIGH, MEDIUM, LOW

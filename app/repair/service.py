@@ -78,7 +78,6 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
        - 미관상 문제 (예: 벽지 찢어짐, 스크래치).
 
     **분석 항목**:
-    - category: 배관(plumbing), 전기(electric), 가구(furniture), 구조(structure), 가전(appliance) 등.
     - item: 구체적인 물건 명칭.
     - issue: 문제 현상.
     - severity: CRITICAL, HIGH, MEDIUM, LOW 중 택1.
@@ -98,7 +97,7 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
         print(f"Gemini JSON Parse Error: {e}, Raw: {response.text}")
         # Fallback
         return RepairAnalysisResult(
-            category="unknown", item="unknown", issue="unknown", 
+            item="unknown", issue="unknown", 
             severity="MEDIUM", priority_score=5, reasoning="분석 실패", 
             repair_suggestion="", description="이미지 분석에 실패했습니다."
         )
