@@ -1,3 +1,4 @@
+from typing import List, Optional
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -22,3 +23,10 @@ class RepairResponse(BaseModel):
     analysis: RepairAnalysisResult
     duplicates: List[DuplicateReportInfo]
     is_new: bool
+
+class RepairRequest(BaseModel):
+    imagePath: str
+    vectorPath: str
+    building: str
+    floor: str
+    room_number: Optional[str] = None

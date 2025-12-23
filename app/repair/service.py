@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import json
 import base64
 import asyncio
@@ -106,12 +107,8 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
 # 🔍 Duplicate Detection (CLIP)
 # ==========================================
 
-async def check_duplicates(image_bytes: bytes, building: str, floor: str, room_number: Optional[str] = None) -> List[DuplicateReportInfo]:
-    model = get_clip_model()
-    
-    # 1. Image Embedding
-    pil_img = Image.open(BytesIO(image_bytes))
-    query_emb = model.encode(pil_img, convert_to_tensor=True)
+async def check_duplicates(query_emb, building: str, floor: str, room_number: Optional[str] = None) -> List[DuplicateReportInfo]:
+    # query_emb is already a tensor or numpy array
     
     duplicates = []
     
@@ -122,14 +119,15 @@ async def check_duplicates(image_bytes: bytes, building: str, floor: str, room_n
             continue
         
         # Room Filter
-        # If input has room (Private), match exact room.
-        # If input no room (Public), match reports with no room.
         report_room = report.get('room_number')
         if room_number != report_room:
             continue
             
         # Similarity
         if report.get('embedding') is not None:
+            # query_emb -> torch tensor if needed, or use util.pytorch_cos_sim logic
+            # Assuming query_emb is loaded via np.load, it's a numpy array.
+            # util.pytorch_cos_sim handles numpy arrays fine.
             sim = util.pytorch_cos_sim(query_emb, report['embedding'])[0][0].item()
             
             # Threshold: 0.85 (High visual similarity)
@@ -149,16 +147,12 @@ async def check_duplicates(image_bytes: bytes, building: str, floor: str, room_n
     duplicates.sort(key=lambda x: x.similarity, reverse=True)
     return duplicates
 
-async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, building: str, floor: str, room_number: Optional[str] = None):
+async def save_report(analysis: RepairAnalysisResult, query_emb, building: str, floor: str, room_number: Optional[str] = None):
     """
     In-memory save for future duplicate checks. 
     In real app, save image to S3/Disk and Embedding to VectorDB.
     """
     global NEXT_REPORT_ID
-    
-    model = get_clip_model()
-    pil_img = Image.open(BytesIO(image_bytes))
-    emb = model.encode(pil_img, convert_to_tensor=True)
     
     REPAIR_REPORTS.append({
         "id": NEXT_REPORT_ID,
@@ -166,7 +160,7 @@ async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, buildi
         "floor": floor,
         "room_number": room_number,
         "description": analysis.description,
-        "embedding": emb
+        "embedding": query_emb
     })
     NEXT_REPORT_ID += 1
 
@@ -174,22 +168,37 @@ async def save_report(analysis: RepairAnalysisResult, image_bytes: bytes, buildi
 # 🚀 Main Logic
 # ==========================================
 
-async def process_repair_request(file: UploadFile, building: str, floor: str, room_number: Optional[str] = None) -> RepairResponse:
-    content = await file.read()
+from .models import RepairRequest
+
+async def process_repair_request(req: RepairRequest) -> RepairResponse:
+    # 1. Read Image from Path (for Gemini)
+    try:
+        with open(req.imagePath, "rb") as f:
+            content = f.read()
+    except Exception as e:
+        raise ValueError(f"Image not found at {req.imagePath}")
+
+    # 2. Load Vector from Path (for Duplicate Check)
+    try:
+        # Load .npy file
+        # Assuming it is a 1D or 2D array. CLIP returns [1, 512].
+        query_emb = np.load(req.vectorPath)
+        # Ensure it's compatible with sentence-transformers util
+    except Exception as e:
+        raise ValueError(f"Vector file not found at {req.vectorPath}")
     
-    # Parallelize? Gemini & CLIP
-    # For now, sequential
+    # Parallelize? Gemini & CLIP Logic
     
-    # 1. Analyze
+    # 3. Analyze (Gemini)
     analysis_task = analyze_image_with_gemini(content)
     
-    # 2. Check Duplicates (Only checks against *previously* saved reports)
-    duplicates_task = check_duplicates(content, building, floor, room_number)
+    # 4. Check Duplicates (Use loaded vector)
+    duplicates_task = check_duplicates(query_emb, req.building, req.floor, req.room_number)
     
     analysis, duplicates = await asyncio.gather(analysis_task, duplicates_task)
     
-    # 3. Save current report
-    await save_report(analysis, content, building, floor, room_number)
+    # 5. Save current report
+    await save_report(analysis, query_emb, req.building, req.floor, req.room_number)
     
     return RepairResponse(
         analysis=analysis,

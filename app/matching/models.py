@@ -107,3 +107,5 @@ class MatchResult(BaseModel):
     totalScore: float
     rank: int
     matchDetails: dict
+
+

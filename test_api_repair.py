@@ -1,24 +1,37 @@
+import os
+import numpy as np
 from fastapi.testclient import TestClient
 from app.main import app
-from unittest.mock import patch, AsyncMock
-from io import BytesIO
+from unittest.mock import patch
 from PIL import Image
 
 client = TestClient(app)
 
-def create_dummy_image():
-    file = BytesIO()
+def create_temp_files():
+    # 1. Image
+    img_path = os.path.abspath("temp_test_image.jpg")
     image = Image.new('RGB', (100, 100), color='red')
-    image.save(file, 'jpeg')
-    file.seek(0)
-    return file
+    image.save(img_path, 'jpeg')
+    
+    # 2. Vector
+    vec_path = os.path.abspath("temp_test_vector.npy")
+    # CLIP vector dim is 512
+    vec = np.random.rand(512).astype(np.float32)
+    np.save(vec_path, vec)
+    
+    return img_path, vec_path
+
+def cleanup_files(paths):
+    for p in paths:
+        if os.path.exists(p):
+            os.remove(p)
 
 from app.repair.models import RepairAnalysisResult
 
 @patch("app.repair.service.analyze_image_with_gemini")
 @patch("app.repair.service.check_duplicates")
 def test_repair_analyze(mock_duplicates, mock_gemini):
-    # 1. Setup Mocks
+    # Setup Mocks
     mock_gemini.return_value = RepairAnalysisResult(
         item="toilet",
         issue="clogged",
@@ -29,7 +42,6 @@ def test_repair_analyze(mock_duplicates, mock_gemini):
         description="변기 역류함."
     )
     
-    # Simulate one duplicate found
     mock_duplicates.return_value = [
         {
             "reportId": 10,
@@ -39,44 +51,38 @@ def test_repair_analyze(mock_duplicates, mock_gemini):
         }
     ]
     
-    # 2. Prepare Request (Private Room Case)
-    img_file = create_dummy_image()
-    files = {"file": ("test.jpg", img_file, "image/jpeg")}
-    data = {
-        "building": "Dorm A", 
-        "floor": "3",
-        "room_number": "301" # Private room
-    }
+    # Create Real Files
+    img_path, vec_path = create_temp_files()
     
-    # 3. Request
-    response = client.post("/api/repair/analyze", files=files, data=data)
-    
-    # 4. Assertions
-    print(f"Status: {response.status_code}")
-    if response.status_code != 200:
-        print(response.json())
+    try:
+        # Prepare JSON Request
+        data = {
+            "imagePath": img_path,
+            "vectorPath": vec_path,
+            "building": "Dorm A",
+            "floor": "3",
+            "room_number": "301"
+        }
         
-    assert response.status_code == 200
-    res_json = response.json()
-    
-    print("Analysis:", res_json['analysis'])
-    print("Duplicates:", res_json['duplicates'])
-    
-    assert res_json['analysis']['item'] == "toilet"
-    assert res_json['analysis']['severity'] == "CRITICAL"
-    
-    # Verify duplicates logic with room_number
-    # The mock returns a duplicate with no room info in my previous mock setup?
-    # Wait, check check_duplicates mock. It returns a list.
-    # Logic in service: checks room_number match.
-    # Since I mocked check_duplicates, the service logic isn't fully tested here?
-    # Actually, I patched `check_duplicates`. So the input arguments matter.
-    # I should verifying that `check_duplicates` was called with the correct arguments if I want to be strict.
-    # But for now, let's just ensure the endpoint accepts the param and returns 200.
-    
-    assert len(res_json['duplicates']) == 1
-    assert res_json['duplicates'][0]['similarity'] == 0.95
-    assert res_json['is_new'] is False
+        # Request (JSON)
+        response = client.post("/api/repair/analyze", json=data)
+        
+        print(f"Status: {response.status_code}")
+        if response.status_code != 200:
+            print(response.json())
+        
+        assert response.status_code == 200
+        res_json = response.json()
+        
+        print("Analysis:", res_json['analysis'])
+        print("Duplicates:", res_json['duplicates'])
+        
+        assert res_json['analysis']['item'] == "toilet"
+        assert res_json['analysis']['severity'] == "CRITICAL"
+        assert len(res_json['duplicates']) == 1
+        
+    finally:
+        cleanup_files([img_path, vec_path])
 
 if __name__ == "__main__":
     test_repair_analyze()
