@@ -121,11 +121,12 @@ uvicorn app.main:app --reload
 ### 2. 시설 고장 신고 API
 *   **URL**: `/api/repair/analyze`
 *   **Method**: `POST`
-*   **Content-Type**: `multipart/form-data`
+*   **Content-Type**: `application/json`
 *   **설명**: 고장난 시설물 이미지를 전송하면 AI가 분석 결과를 반환합니다. 중복 신고 감지 기능이 포함되어 있습니다.
 
-#### Request
-*   `file`: 이미지 파일 (binary)
+#### Request (JSON)
+*   `imagePath`: 서버 내에 저장된 이미지 파일의 절대 경로 (Gemini 분석용)
+*   `vectorPath`: 서버 내에 저장된 이미지 임베딩 벡터(.npy) 파일의 경로 (CLIP 중복 검사용)
 *   `building`: 건물명 (예: "Dorm A")
 *   `floor`: 층수 (예: "3")
 *   `room_number`: (선택) 호수 (예: "1201"). 개인 시설인 경우 입력, 공용 시설인 경우 생략.
