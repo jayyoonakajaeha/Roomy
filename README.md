@@ -134,7 +134,6 @@ uvicorn app.main:app --reload
 ```json
 {
   "analysis": {
-    "category": "plumbing",
     "item": "toilet",
     "issue": "clogged",
     "severity": "CRITICAL",
