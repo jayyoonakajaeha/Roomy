@@ -70,12 +70,17 @@ uvicorn app.main:app --reload
     "cleaningCycle": "EVERY_TWO_DAYS",
     "drinkingStyle": "RARELY",
     "bugKiller": false,
+    "heavySleeper": true,
+    "goodAtAlarm": false,
     "absentDays": ["SUNDAY"],
     "hobby": "독서"
   },
   "preferences": {
     "preferNonSmoker": true,
-    "preferGoodAtBugs": true
+    "preferGoodAtBugs": true,
+    "preferQuietSleeper": false,
+    "preferHeavySleeper": true,
+    "preferGoodAtAlarm": false
   },
   "candidates": [
     {
@@ -92,6 +97,8 @@ uvicorn app.main:app --reload
       "cleaningCycle": "WEEKLY",
       "drinkingStyle": "SOMETIMES",
       "bugKiller": true,
+      "heavySleeper": false,
+      "goodAtAlarm": true,
       "absentDays": [],
       "hobby": "게임"
       // ... 기타 프로필 필드
@@ -105,16 +112,16 @@ uvicorn app.main:app --reload
 [
   {
     "userId": 1,
-    "name": "후보자1",
-    "totalScore": 95.5,
+    "name": "LiveCandidate",
+    "totalScore": 79.0,
     "rank": 1,
     "matchDetails": {
       "tagScore": 40.0,
-      "prefScore": 30.0,
-      "textScore": 25.5,
+      "prefScore": 22.5,
+      "textScore": 16.5,
       "age": 23
     }
-  },
+  }
 ]
 ```
 

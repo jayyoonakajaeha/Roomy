@@ -41,6 +41,8 @@ def test_matching():
         "drinkingStyle": "RARELY",
         "snoring": False,
         "bugKiller": False,
+        "heavySleeper": False,
+        "goodAtAlarm": True,
         "intro": "Hello", 
         # No roommateCriteriaEmbedding here
     }
@@ -49,7 +51,8 @@ def test_matching():
         "preferNonSmoker": True,
         "preferGoodAtBugs": True,
         "preferQuietSleeper": True,
-        "preferNonDrinker": True
+        "preferHeavySleeper": False,
+        "preferGoodAtAlarm": True
     }
 
     candidates = [
@@ -65,6 +68,8 @@ def test_matching():
             "drinkingStyle": "RARELY",
             "snoring": False,
             "bugKiller": False,
+            "heavySleeper": True,
+            "goodAtAlarm": True,
             "intro": "Hi",
             # No selfIntroductionEmbedding here
         }

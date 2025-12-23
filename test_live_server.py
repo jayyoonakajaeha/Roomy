@@ -12,16 +12,16 @@ def test_live_server():
     
     print("2. Checking Server Health...")
     try:
-        health_res = httpx.get("http://127.0.0.1:8001/")
+        health_res = httpx.get("http://127.0.0.1:8002/")
         print(f"Health Check: {health_res.status_code}")
         print(health_res.text)
     except Exception as e:
         print(f"Health Check Failed: {e}")
         return
 
-    print("3. Sending Match Request to http://127.0.0.1:8001/api/matching/match ...")
+    print("3. Sending Match Request to http://127.0.0.1:8002/api/matching/match ...")
     
-    url = "http://127.0.0.1:8001/api/matching/match"
+    url = "http://127.0.0.1:8002/api/matching/match"
     
     payload = {
         "myProfile": {
@@ -36,6 +36,8 @@ def test_live_server():
             "drinkingStyle": "RARELY",
             "snoring": False,
             "bugKiller": False,
+            "heavySleeper": False,
+            "goodAtAlarm": True,
             "intro": "Living Test",
             "hobby": "Testing"
         },
@@ -43,7 +45,8 @@ def test_live_server():
             "preferNonSmoker": True,
             "preferGoodAtBugs": True,
             "preferQuietSleeper": True,
-            "preferNonDrinker": True
+            "preferHeavySleeper": False,
+            "preferGoodAtAlarm": True
         },
         "candidates": [
             {
@@ -58,6 +61,8 @@ def test_live_server():
                 "drinkingStyle": "RARELY",
                 "snoring": False,
                 "bugKiller": False,
+                "heavySleeper": True,
+                "goodAtAlarm": True,
                 "intro": "I am live",
                 "hobby": "Being Live"
             }

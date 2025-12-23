@@ -127,7 +127,8 @@ def calculate_hybrid_match(request: MatchRequest) -> List[MatchResult]:
         if prefs.preferNonSmoker: active_prefs.append(lambda u: not u.smoker)
         if prefs.preferGoodAtBugs: active_prefs.append(lambda u: u.bugKiller)
         if prefs.preferQuietSleeper: active_prefs.append(lambda u: not u.snoring)
-        if prefs.preferNonDrinker: active_prefs.append(lambda u: u.drinkingStyle == DrinkingStyle.RARELY)
+        if prefs.preferHeavySleeper: active_prefs.append(lambda u: u.heavySleeper)
+        if prefs.preferGoodAtAlarm: active_prefs.append(lambda u: u.goodAtAlarm)
         
         if len(active_prefs) == 0:
             # 선호 조건이 없으면 감점 없음 (만점)
