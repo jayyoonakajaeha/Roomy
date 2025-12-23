@@ -154,18 +154,21 @@ uvicorn app.main:app --reload --port 8001
 #### Request 예시 (JSON)
 ```json
 {
-  "imagePath": "/var/data/images/repair_new.jpg",
   "existingReportIds": [1024, 1025, 1030],
+  "totalReportCount": 1030,
   "floor": "3",
   "room_number": "301"
 }
 ```
 
+> **이미지 경로**: 고정 경로 `storage/temp/pending.jpg` 사용 (request에서 제외)
+> 프론트는 이 경로에 이미지를 저장한 후 API 호출
+
 **필드 설명:**
 | 필드명 | 타입 | 필수 | 설명 |
 |--------|------|------|------|
-| `imagePath` | string | ✓ | 신규 신고 이미지 경로 (API에서 CLIP 임베딩 계산) |
 | `existingReportIds` | int[] | ✓ | 백엔드에서 **위치(층/호수) 필터링한 기존 게시물 ID 목록** |
+| `totalReportCount` | int | ✓ | 현재 총 게시물 수 (새 ID = totalReportCount + 1) |
 | `floor` | string | ✓ | 층수 |
 | `room_number` | string | | 호수 (공용시설이면 null 또는 생략) |
 
@@ -176,6 +179,8 @@ uvicorn app.main:app --reload --port 8001
 4. 유사도 80% 이상이면 중복으로 판정
 
 #### Response 예시
+
+**중복 신고인 경우:**
 ```json
 {
   "analysis": {
@@ -183,8 +188,8 @@ uvicorn app.main:app --reload --port 8001
     "issue": "배수 불량 (막힘)",
     "severity": "CRITICAL",
     "priority_score": 9,
-    "reasoning": "변기 막힘은 위생 문제와 직결되며 거주자의 기본 생리 욕구 해결을 불가능하게 하므로 즉각적인 조치가 필요한 긴급 사항입니다.",
-    "description": "과도한 화장지 사용으로 인해 변기가 막혀 배수가 원활하지 않은 상태입니다."
+    "reasoning": "변기 막힘은 위생 문제와 직결...",
+    "description": "과도한 화장지 사용으로 인해 변기가 막혀..."
   },
   "duplicates": [
     {
@@ -194,9 +199,23 @@ uvicorn app.main:app --reload --port 8001
       "location": "3층 301호"
     }
   ],
-  "is_new": false
+  "is_new": false,
+  "newReportId": null
 }
 ```
+
+**새로운 신고인 경우:**
+```json
+{
+  "analysis": { ... },
+  "duplicates": [],
+  "is_new": true,
+  "newReportId": 1031
+}
+```
+> 새 신고일 때만 `newReportId`가 할당되고, 임베딩/이미지 파일이 자동 저장됩니다.
+> - `storage/repair_vectors/1031.npy`
+> - `storage/repair_images/1031.jpg`
 
 ---
 

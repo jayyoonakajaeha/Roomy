@@ -135,20 +135,45 @@ async def check_duplicates(query_emb, existing_report_ids: List[int], floor: str
     duplicates.sort(key=lambda x: x.similarity, reverse=True)
     return duplicates
 
-async def save_report(analysis: RepairAnalysisResult, query_emb, floor: str, room_number: Optional[str] = None):
+async def save_report_files(new_id: int, temp_image_path: str, query_emb, floor: str, room_number: Optional[str] = None, description: str = ""):
     """
-    In-memory save for future duplicate checks. 
+    중복이 아닌 경우: 임시 이미지를 영구 저장소로 이동, 임베딩 저장.
+    - 임베딩 벡터: storage/repair_vectors/{new_id}.npy
+    - 이미지 이동: storage/temp/pending.jpg → storage/repair_images/{new_id}.jpg
     """
-    global NEXT_REPORT_ID
+    import shutil
     
+    # 디렉토리 생성
+    os.makedirs("storage/repair_vectors", exist_ok=True)
+    os.makedirs("storage/repair_images", exist_ok=True)
+    
+    # 1. 임베딩 저장
+    vector_path = f"storage/repair_vectors/{new_id}.npy"
+    np.save(vector_path, query_emb)
+    
+    # 2. 임시 이미지 → 영구 저장소로 이동
+    _, ext = os.path.splitext(temp_image_path)
+    new_image_path = f"storage/repair_images/{new_id}{ext}"
+    shutil.move(temp_image_path, new_image_path)
+    
+    # 3. In-memory 저장 (테스트용)
     REPAIR_REPORTS.append({
-        "id": NEXT_REPORT_ID,
+        "id": new_id,
         "floor": floor,
         "room_number": room_number,
-        "description": analysis.description,
+        "description": description,
         "embedding": query_emb
     })
-    NEXT_REPORT_ID += 1
+    
+    return new_image_path
+
+def delete_temp_image(temp_image_path: str):
+    """중복 신고인 경우 임시 이미지 삭제"""
+    try:
+        if os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
+    except Exception as e:
+        print(f"Failed to delete temp image: {e}")
 
 # ==========================================
 # 🚀 Main Logic
@@ -156,37 +181,49 @@ async def save_report(analysis: RepairAnalysisResult, query_emb, floor: str, roo
 
 from .models import RepairRequest
 
+# 고정 임시 이미지 경로
+TEMP_IMAGE_PATH = "storage/temp/pending.jpg"
+
 async def process_repair_request(req: RepairRequest) -> RepairResponse:
-    # 1. Read Image from Path
+    # 1. Read Image from Fixed Path
     try:
-        with open(req.imagePath, "rb") as f:
+        with open(TEMP_IMAGE_PATH, "rb") as f:
             content = f.read()
     except Exception as e:
-        raise ValueError(f"Image not found at {req.imagePath}")
+        raise ValueError(f"Image not found at {TEMP_IMAGE_PATH}")
 
     # 2. Calculate CLIP Embedding (신규 이미지 벡터 계산)
     pil_img = Image.open(BytesIO(content))
     clip_model = get_clip_model()
     query_emb = clip_model.encode(pil_img, convert_to_numpy=True)
     
-    # 3. Analyze (Gemini) - 병렬 처리
-    analysis_task = analyze_image_with_gemini(content)
-    
-    # 4. Check Duplicates (백엔드가 필터링한 ID 목록과 비교)
-    duplicates_task = check_duplicates(
+    # 3. Check Duplicates FIRST (중복이면 Gemini 호출 안함 = 토큰 절약)
+    duplicates = await check_duplicates(
         query_emb, 
         req.existingReportIds,
         req.floor, 
         req.room_number
     )
     
-    analysis, duplicates = await asyncio.gather(analysis_task, duplicates_task)
+    is_new = len(duplicates) == 0
     
-    # 5. Save current report
-    await save_report(analysis, query_emb, req.floor, req.room_number)
+    if is_new:
+        # 4. 신규일 때만 Gemini 분석
+        analysis = await analyze_image_with_gemini(content)
+        new_id = req.totalReportCount + 1
+        
+        # 5. 파일 저장 (description 포함)
+        await save_report_files(new_id, TEMP_IMAGE_PATH, query_emb, req.floor, req.room_number, analysis.description)
+    else:
+        # 중복: Gemini 스킵, 임시 파일 삭제
+        analysis = None
+        new_id = None
+        delete_temp_image(TEMP_IMAGE_PATH)
     
     return RepairResponse(
         analysis=analysis,
         duplicates=duplicates,
-        is_new=(len(duplicates) == 0)
+        is_new=is_new,
+        newReportId=new_id
     )
+

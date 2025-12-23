@@ -17,12 +17,13 @@ class DuplicateReportInfo(BaseModel):
     image_url: Optional[str] = None
 
 class RepairResponse(BaseModel):
-    analysis: RepairAnalysisResult
+    analysis: Optional[RepairAnalysisResult] = None  # 중복이면 None
     duplicates: List[DuplicateReportInfo]
     is_new: bool
+    newReportId: Optional[int] = None  # 중복이 아닌 경우에만 할당된 새 ID
 
 class RepairRequest(BaseModel):
-    imagePath: str  # 신규 신고 이미지 경로 (CLIP 임베딩 계산용)
     existingReportIds: List[int] = []  # 백엔드에서 위치 필터링한 기존 게시물 ID 목록
+    totalReportCount: int  # 현재 총 게시물 수 (새 ID = totalReportCount + 1)
     floor: str  # 층수
     room_number: Optional[str] = None  # 호수 (공용시설이면 null)
