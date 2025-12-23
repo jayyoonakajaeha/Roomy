@@ -54,8 +54,6 @@ class UserProfile(BaseModel):
     smoker: bool
     snoring: bool
     bugKiller: bool
-    heavySleeper: bool  # 잠귀 어두운 사람 (깊은 잠)
-    goodAtAlarm: bool   # 알람 잘 깨는 사람
     
     # Time (Scale Input)
     sleepTime: int 
@@ -93,8 +91,6 @@ class UserProfile(BaseModel):
                 "cleaningCycle": "DAILY",
                 "drinkingStyle": "RARELY",
                 "bugKiller": False,
-                "heavySleeper": True,
-                "goodAtAlarm": False,
                 "absentDays": ["SUNDAY"],
                 "hobby": "독서"
             }]
@@ -115,8 +111,6 @@ class UserPreferences(BaseModel):
     preferNonSmoker: bool = False      # 흡연 안하는 사람
     preferGoodAtBugs: bool = False     # 벌레 잘 잡는 사람
     preferQuietSleeper: bool = False   # 코 안 고는 사람
-    preferHeavySleeper: bool = False   # 잠귀 어두운 사람
-    preferGoodAtAlarm: bool = False    # 알람 잘 깨는 사람
     
     # Note: Text queries are now handled via UserProfile.roommateDescription embedding
     
@@ -141,17 +135,13 @@ class MatchRequest(BaseModel):
                     "cleaningCycle": "DAILY",
                     "drinkingStyle": "RARELY",
                     "bugKiller": False,
-                    "heavySleeper": True,
-                    "goodAtAlarm": False,
                     "absentDays": ["SUNDAY"],
                     "hobby": "독서"
                 },
                 "preferences": {
                     "preferNonSmoker": True,
                     "preferGoodAtBugs": True,
-                    "preferQuietSleeper": False,
-                    "preferHeavySleeper": True,
-                    "preferGoodAtAlarm": False
+                    "preferQuietSleeper": False
                 },
                 "candidates": [{
                     "id": 1,
@@ -165,8 +155,6 @@ class MatchRequest(BaseModel):
                     "cleaningCycle": "WEEKLY",
                     "drinkingStyle": "SOMETIMES",
                     "bugKiller": True,
-                    "heavySleeper": False,
-                    "goodAtAlarm": True,
                     "absentDays": [],
                     "hobby": "게임"
                 }]
