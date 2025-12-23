@@ -257,7 +257,7 @@ uvicorn app.main:app --reload --port 8001
 |---|---|---|---|---|
 | `id` | BigInt | PK | NO | Auto Increment ID |
 | `floor` | Varchar(10) | IDX | NO | 층수 (예: "3") |
-| `room_number` | Varchar(20) | IDX | YES | 호수 (공용시설이면 NULL) |
+| `room_number` | Varchar(20) | IDX | YES | 호수 (공용시설이면 None) |
 | `item` | Varchar(100) | | NO | 고장 물품 (예: 변기, 싱크대) |
 | `issue` | Varchar(100) | | NO | 증상 (예: 막힘, 누수) |
 | `severity` | Enum | | NO | 심각도 ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW') |
