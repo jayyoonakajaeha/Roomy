@@ -149,13 +149,19 @@ uvicorn app.main:app --reload
 #### Request 예시 (JSON)
 ```json
 {
-  "imagePath": "/var/data/images/repair_01.jpg",
-  "vectorPath": "/var/data/vectors/repair_01.npy",
-  "building": "Dorm A",
+  "imagePath": "/var/data/images/repair_new.jpg",
+  "existingReportIds": [1024, 1025, 1030],
   "floor": "3",
   "room_number": "301"
 }
 ```
+
+**필드 설명:**
+- `imagePath`: 신규 신고 이미지 경로 (API에서 CLIP 임베딩 계산)
+- `existingReportIds`: 프론트에서 **위치(층/호수)가 일치하는 기존 게시물**의 ID 목록
+- `floor`: 층수 (필수)
+- `room_number`: 호수 (선택) - **공용시설이면 null, 이 경우 층만 일치하는 게시물 비교**
+
 
 #### Response 예시
 ```json

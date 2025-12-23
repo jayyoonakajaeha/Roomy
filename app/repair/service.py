@@ -115,34 +115,27 @@ async def analyze_image_with_gemini(image_bytes: bytes) -> RepairAnalysisResult:
 # 🔍 Duplicate Detection (CLIP)
 # ==========================================
 
-async def check_duplicates(query_emb, building: str, floor: str, room_number: Optional[str] = None) -> List[DuplicateReportInfo]:
-    # query_emb is already a tensor or numpy array
-    
+async def check_duplicates(query_emb, existing_report_ids: List[int], floor: str, room_number: Optional[str] = None) -> List[DuplicateReportInfo]:
+    """
+    기존 게시물 ID 목록(프론트에서 위치 기반 필터링 완료)에 대해
+    신규 이미지와의 유사도를 비교하여 중복 여부 판단.
+    """
     duplicates = []
     
-    # 2. Search in Mock DB
+    # ID 목록에 해당하는 게시물만 비교
     for report in REPAIR_REPORTS:
-        # Location Filter (Building & Floor match required)
-        if report['building'] != building or report['floor'] != floor:
-            continue
-        
-        # Room Filter
-        report_room = report.get('room_number')
-        if room_number != report_room:
+        if report['id'] not in existing_report_ids:
             continue
             
-        # Similarity
+        # 저장된 임베딩과 비교
         if report.get('embedding') is not None:
-            # query_emb -> torch tensor if needed, or use util.pytorch_cos_sim logic
-            # Assuming query_emb is loaded via np.load, it's a numpy array.
-            # util.pytorch_cos_sim handles numpy arrays fine.
             sim = util.pytorch_cos_sim(query_emb, report['embedding'])[0][0].item()
             
-            # Threshold: 0.80 (Adjusted for test cases)
+            # Threshold: 0.80 (80% 이상 유사 = 중복 의심)
             if sim >= 0.80:
-                loc_str = f"{report['building']} {report['floor']}F"
-                if report_room:
-                    loc_str += f" {report_room}호"
+                loc_str = f"{report['floor']}층"
+                if report.get('room_number'):
+                    loc_str += f" {report['room_number']}호"
                     
                 duplicates.append(DuplicateReportInfo(
                     reportId=report['id'],
@@ -151,11 +144,11 @@ async def check_duplicates(query_emb, building: str, floor: str, room_number: Op
                     location=loc_str
                 ))
     
-    # Sort by sim desc
+    # 유사도 높은 순 정렬
     duplicates.sort(key=lambda x: x.similarity, reverse=True)
     return duplicates
 
-async def save_report(analysis: RepairAnalysisResult, query_emb, building: str, floor: str, room_number: Optional[str] = None):
+async def save_report(analysis: RepairAnalysisResult, query_emb, floor: str, room_number: Optional[str] = None):
     """
     In-memory save for future duplicate checks. 
     In real app, save image to S3/Disk and Embedding to VectorDB.
@@ -164,7 +157,6 @@ async def save_report(analysis: RepairAnalysisResult, query_emb, building: str, 
     
     REPAIR_REPORTS.append({
         "id": NEXT_REPORT_ID,
-        "building": building,
         "floor": floor,
         "room_number": room_number,
         "description": analysis.description,
@@ -179,34 +171,35 @@ async def save_report(analysis: RepairAnalysisResult, query_emb, building: str, 
 from .models import RepairRequest
 
 async def process_repair_request(req: RepairRequest) -> RepairResponse:
-    # 1. Read Image from Path (for Gemini)
+    # 1. Read Image from Path
     try:
         with open(req.imagePath, "rb") as f:
             content = f.read()
     except Exception as e:
         raise ValueError(f"Image not found at {req.imagePath}")
 
-    # 2. Load Vector from Path (for Duplicate Check)
-    try:
-        # Load .npy file
-        # Assuming it is a 1D or 2D array. CLIP returns [1, 512].
-        query_emb = np.load(req.vectorPath)
-        # Ensure it's compatible with sentence-transformers util
-    except Exception as e:
-        raise ValueError(f"Vector file not found at {req.vectorPath}")
+    # 2. Calculate CLIP Embedding (신규 이미지 벡터 계산)
+    from PIL import Image
+    from io import BytesIO
+    pil_img = Image.open(BytesIO(content))
+    clip_model = get_clip_model()
+    query_emb = clip_model.encode(pil_img, convert_to_numpy=True)
     
-    # Parallelize? Gemini & CLIP Logic
-    
-    # 3. Analyze (Gemini)
+    # 3. Analyze (Gemini) - 병렬 처리
     analysis_task = analyze_image_with_gemini(content)
     
-    # 4. Check Duplicates (Use loaded vector)
-    duplicates_task = check_duplicates(query_emb, req.building, req.floor, req.room_number)
+    # 4. Check Duplicates (기존 게시물 ID 목록과 비교)
+    duplicates_task = check_duplicates(
+        query_emb, 
+        req.existingReportIds,
+        req.floor, 
+        req.room_number
+    )
     
     analysis, duplicates = await asyncio.gather(analysis_task, duplicates_task)
     
-    # 5. Save current report
-    await save_report(analysis, query_emb, req.building, req.floor, req.room_number)
+    # 5. Save current report (새로 계산한 임베딩 저장)
+    await save_report(analysis, query_emb, req.floor, req.room_number)
     
     return RepairResponse(
         analysis=analysis,
